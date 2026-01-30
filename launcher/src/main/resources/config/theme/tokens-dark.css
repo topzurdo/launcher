@@ -1,0 +1,35 @@
+/* Design tokens — Gold Luxury theme. 8px spacing scale. */
+.root,
+.root-stack {
+  -fx-spacing-unit: 8;
+
+  /* Primary Accents - Gold/Amber */
+  -accent: #f59e0b;
+  -accent-muted: #f59e0b3d;
+  -accent-hover: #d97706;
+
+  /* Secondary Accents - Deep Gold */
+  -accent-secondary: #fcd34d;
+  -accent-secondary-muted: #fcd34d4d;
+  -accent-secondary-hover: #fbbf24;
+
+  /* Backgrounds - Warm Dark (Stone) */
+  -bg-base: #1c1917;
+  -bg-elevated: #292524;
+  -bg-deep: #0c0a09;
+  -bg-input: #292524;
+
+  /* Text - Warm White */
+  -text-primary: #fafaf9;
+  -text-muted: #a8a29e;
+  -text-dim: #78716c;
+
+  /* Borders - Gold tint */
+  -border-subtle: #f59e0b20;
+  -border-default: #f59e0b40;
+  -border-accent-top: #f59e0b60;
+
+  /* Status */
+  -success: #10b981;
+  -danger: #ef4444;
+}

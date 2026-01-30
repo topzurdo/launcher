@@ -1,0 +1,67 @@
+package com.topzurdo.mod.modules.hud;
+
+import com.topzurdo.mod.modules.Module;
+import com.topzurdo.mod.modules.Setting;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.hit.HitResult;
+
+/**
+ * Target Info Module - displays information about targeted entity
+ */
+public class TargetInfoModule extends Module {
+
+    private Setting<Integer> posX;
+    private Setting<Integer> posY;
+    private Setting<Boolean> showHealth;
+    private Setting<Boolean> showDistance;
+
+    public TargetInfoModule() {
+        super("target_info", "Target Info", "Информация о цели", Category.HUD);
+
+        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 10, 0, 500));
+        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 70, 0, 500));
+        showHealth = addSetting(Setting.ofBoolean("show_health", "Здоровье", "Показывать здоровье", true));
+        showDistance = addSetting(Setting.ofBoolean("show_distance", "Дистанция", "Показывать расстояние", true));
+    }
+
+    @Override
+    public void onRender(float partialTicks) {
+        if (!isEnabled()) return;
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.player == null || mc.crosshairTarget == null) return;
+
+        HitResult hit = mc.crosshairTarget;
+        if (hit.getType() != HitResult.Type.ENTITY) return;
+        if (!(hit instanceof EntityHitResult)) return;
+
+        EntityHitResult entityHit = (EntityHitResult) hit;
+        if (!(entityHit.getEntity() instanceof LivingEntity)) return;
+        LivingEntity target = (LivingEntity) entityHit.getEntity();
+
+        int x = posX.getValue();
+        int y = posY.getValue();
+        MatrixStack ms = new MatrixStack();
+        TextRenderer tr = mc.textRenderer;
+
+        tr.draw(ms, target.getName().getString(), x, y, 0xFFFFFF);
+        y += 10;
+
+        if (showHealth.getValue()) {
+            float hp = target.getHealth();
+            float maxHp = target.getMaxHealth();
+            int pct = (int) (100f * hp / maxHp);
+            int color = pct > 50 ? 0x55FF55 : pct > 25 ? 0xFFFF55 : 0xFF5555;
+            tr.draw(ms, String.format("HP: %.1f / %.1f", hp, maxHp), x, y, color);
+            y += 10;
+        }
+
+        if (showDistance.getValue()) {
+            double dist = mc.player.distanceTo(target);
+            tr.draw(ms, String.format("Distance: %.1fm", dist), x, y, 0xAAAAAA);
+        }
+    }
+}

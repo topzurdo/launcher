@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "topzurdo",
+  "version": "${version}",
+  "name": "TopZurdo Client",
+  "description": "TopZurdo Client - Premium Minecraft mod for FunTime.su. FPS Optimization, Custom Particles, HUD Elements, Visual Enhancements, Quality of Life utilities. All features are 100% legal according to FunTime.su rules. Press Right Shift to open the menu.",
+  "authors": ["TopZurdo Team"],
+  "contact": {
+    "homepage": "https://funtime.su"
+  },
+  "license": "All Rights Reserved",
+  "environment": "client",
+  "entrypoints": {
+    "main": ["com.topzurdo.mod.TopZurdoMod"],
+    "client": ["com.topzurdo.mod.TopZurdoClientMod"]
+  },
+  "mixins": [
+    "mixins.topzurdo.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.14.0",
+    "minecraft": "~1.16.5",
+    "java": ">=8",
+    "fabric": "*"
+  },
+  "suggests": {
+    "cloth-config": "*"
+  }
+}
