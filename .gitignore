@@ -8,6 +8,10 @@ out/
 *.iml
 .vscode/
 
+# Cursor / local tooling
+.cursor/
+.shared/
+
 # Compiled
 *.class
 *.jar

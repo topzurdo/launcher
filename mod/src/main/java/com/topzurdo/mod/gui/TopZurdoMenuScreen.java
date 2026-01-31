@@ -227,7 +227,7 @@ public class TopZurdoMenuScreen extends Screen {
         }
 
         int settingsContentWidth = settingsPanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER;
-        int w = Math.max(OceanTheme.SETTINGS_ROW_MIN_WIDTH, settingsContentWidth - OceanTheme.SETTINGS_PAD_X * 2 - 12);
+        int w = Math.max(OceanTheme.SETTINGS_ROW_MIN_WIDTH, settingsContentWidth - OceanTheme.SETTINGS_PAD_X * 2);
         String moduleId = selectedModule.getId();
         for (Setting<?> s : selectedModule.getSettings()) {
             if (s == null) continue;

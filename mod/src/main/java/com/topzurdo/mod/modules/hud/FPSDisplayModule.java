@@ -18,8 +18,8 @@ public class FPSDisplayModule extends Module {
     public FPSDisplayModule() {
         super("fps_display", "FPS Display", "Отображение FPS", Category.HUD);
 
-        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 10, 0, 500));
-        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 30, 0, 500));
+        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 8, 0, 2000));
+        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 52, 0, 2000));
         colorByFps = addSetting(Setting.ofBoolean("color_by_fps", "Цвет по FPS", "Менять цвет в зависимости от FPS", true));
     }
 

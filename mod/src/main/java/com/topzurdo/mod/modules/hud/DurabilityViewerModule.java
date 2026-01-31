@@ -21,8 +21,8 @@ public class DurabilityViewerModule extends Module {
     public DurabilityViewerModule() {
         super("durability_viewer", "Durability Viewer", "Прочность предмета в руке", Category.HUD);
 
-        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 10, 0, 500));
-        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 200, 0, 500));
+        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 8, 0, 2000));
+        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 218, 0, 2000));
         showPercent = addSetting(Setting.ofBoolean("show_percent", "Проценты", "Показывать в процентах", true));
         warnLow = addSetting(Setting.ofBoolean("warn_low", "Предупреждение", "Предупреждать о низкой прочности", true));
         warnThreshold = addSetting(Setting.ofInt("warn_threshold", "Порог", "Порог предупреждения (%)", 10, 1, 50));
