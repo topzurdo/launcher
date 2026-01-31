@@ -227,7 +227,7 @@ public class TopZurdoMenuScreen extends Screen {
         }
 
         int settingsContentWidth = settingsPanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER;
-        int w = Math.max(OceanTheme.SETTINGS_ROW_MIN_WIDTH, settingsContentWidth - OceanTheme.SETTINGS_PAD_X * 2);
+        int w = Math.max(OceanTheme.SETTINGS_ROW_MIN_WIDTH, settingsContentWidth - OceanTheme.SETTINGS_PAD_X * 2 - 12);
         String moduleId = selectedModule.getId();
         for (Setting<?> s : selectedModule.getSettings()) {
             if (s == null) continue;
@@ -306,10 +306,7 @@ public class TopZurdoMenuScreen extends Screen {
         renderCategoryPanel(ms, lmx, lmy, partialTicks);
 
         int contentBottom = guiTop + guiHeight - scaledContentBottomOffset;
-        int sepH = Math.max(0, contentBottom - (guiTop + scaledTitleBarH));
-        drawVerticalLine(ms, guiLeft + categoryPanelWidth, guiTop + scaledTitleBarH, sepH);
         renderModulePanel(ms, lmx, lmy, contentBottom, eased, rawCat, partialTicks);
-        drawVerticalLine(ms, guiLeft + categoryPanelWidth + modulePanelWidth, guiTop + scaledTitleBarH, sepH);
 
         renderSettingsPanel(ms, lmx, lmy, contentBottom, eased, partialTicks);
         renderFooter(ms, lmx, lmy);
@@ -545,7 +542,6 @@ public class TopZurdoMenuScreen extends Screen {
                 return true;
         }
 
-        // Footer buttons
         return false;
     }
 
@@ -561,13 +557,39 @@ public class TopZurdoMenuScreen extends Screen {
     }
 
     private void renderFooter(MatrixStack ms, int mouseX, int mouseY) {
+        boolean logOn = TopZurdoMod.getConfig() != null && TopZurdoMod.getConfig().isDebugLogging();
+        String logLabel = logOn ? I18n.translate("topzurdo.gui.debug_logging.on") : I18n.translate("topzurdo.gui.debug_logging.off");
+        String clothLabel = I18n.translate("topzurdo.gui.cloth_config");
+        footerLogW = textRenderer.getWidth(logLabel) + 14;
+        footerLogH = 18;
+        clothConfigW = textRenderer.getWidth(clothLabel) + 14;
+        clothConfigH = 18;
         int footerRowTop = guiTop + guiHeight - OceanTheme.FOOTER_H;
-        int hintMaxW = guiWidth - OceanTheme.SPACE_32;
+        clothConfigX = guiLeft + guiWidth - footerLogW - clothConfigW - OceanTheme.SPACE_32;
+        clothConfigY = footerRowTop + (OceanTheme.FOOTER_H - clothConfigH) / 2;
+        footerLogX = guiLeft + guiWidth - footerLogW - OceanTheme.SPACE_12;
+        footerLogY = footerRowTop + (OceanTheme.FOOTER_H - footerLogH) / 2;
+
+        boolean clothHover = mouseX >= clothConfigX && mouseX < clothConfigX + clothConfigW && mouseY >= clothConfigY && mouseY < clothConfigY + clothConfigH;
+        int clothBg = clothHover ? UIRenderHelper.withAlpha(OceanTheme.ACCENT, 0.15f) : OceanTheme.BG_INNER;
+        int clothBorder = clothHover ? OceanTheme.BORDER_HOVER : OceanTheme.BORDER_SUBTLE;
+        UIRenderHelper.fillRoundRect(ms, clothConfigX, clothConfigY, clothConfigW, clothConfigH, DesignTokens.RADIUS, clothBg);
+        UIRenderHelper.drawRoundBorder(ms, clothConfigX, clothConfigY, clothConfigW, clothConfigH, DesignTokens.RADIUS, OceanTheme.BORDER_WIDTH, clothBorder);
+        textRenderer.drawWithShadow(ms, clothLabel, clothConfigX + 7, clothConfigY + 5, clothHover ? OceanTheme.ACCENT : DesignTokens.fgMuted());
+
+        int hintMaxW = guiWidth - footerLogW - clothConfigW - OceanTheme.SPACE_32;
         List<String> lines = GuiUtil.wrapHint(textRenderer, I18n.translate("topzurdo.gui.footer"), hintMaxW);
         int hoverZoneTop = guiTop + guiHeight - scaledContentBottomOffset;
         int fy = lines.size() > 1 ? hoverZoneTop + 6 : footerRowTop + (OceanTheme.FOOTER_H - 9) / 2;
         for (int i = 0; i < lines.size(); i++)
             textRenderer.drawWithShadow(ms, lines.get(i), guiLeft + OceanTheme.SPACE_12, fy + i * 10, DesignTokens.fgMuted());
+
+        boolean logHover = mouseX >= footerLogX && mouseX < footerLogX + footerLogW && mouseY >= footerLogY && mouseY < footerLogY + footerLogH;
+        int logBg = logHover ? UIRenderHelper.withAlpha(OceanTheme.ACCENT, 0.15f) : OceanTheme.BG_INNER;
+        int logBrd = logOn ? OceanTheme.SUCCESS : (logHover ? OceanTheme.BORDER_HOVER : OceanTheme.BORDER_SUBTLE);
+        UIRenderHelper.fillRoundRect(ms, footerLogX, footerLogY, footerLogW, footerLogH, DesignTokens.RADIUS, logBg);
+        UIRenderHelper.drawRoundBorder(ms, footerLogX, footerLogY, footerLogW, footerLogH, DesignTokens.RADIUS, OceanTheme.BORDER_WIDTH, logBrd);
+        textRenderer.drawWithShadow(ms, logLabel, footerLogX + 7, footerLogY + 5, logOn ? OceanTheme.SUCCESS : (logHover ? OceanTheme.ACCENT : DesignTokens.fgMuted()));
     }
 
     private void drawOceanPanel(MatrixStack ms, int x, int y, int w, int h, int catW) {
@@ -746,6 +768,23 @@ public class TopZurdoMenuScreen extends Screen {
             return true;
         }
 
+        if (button == 0 && mx >= clothConfigX && mx < clothConfigX + clothConfigW && localMy >= clothConfigY && localMy < clothConfigY + clothConfigH) {
+            try {
+                Screen clothScreen = com.topzurdo.mod.config.TopZurdoClothConfigScreen.create(this);
+                if (clothScreen != null && client != null) client.openScreen(clothScreen);
+            } catch (Throwable t) {
+                if (TopZurdoMod.getInstance() != null) TopZurdoMod.getLogger().warn("[TopZurdo] Cloth Config open failed: {}", t.getMessage());
+            }
+            return true;
+        }
+        if (button == 0 && mx >= footerLogX && mx < footerLogX + footerLogW && localMy >= footerLogY && localMy < footerLogY + footerLogH) {
+            ModConfig cfg = TopZurdoMod.getConfig();
+            if (cfg != null) {
+                cfg.setDebugLogging(!cfg.isDebugLogging());
+                TopZurdoMod.logEvent("Логирование: " + (cfg.isDebugLogging() ? "вкл" : "выкл"));
+            }
+            return true;
+        }
         return super.mouseClicked(mouseX, mouseY, button);
         } catch (Throwable t) {
             if (TopZurdoMod.getInstance() != null) TopZurdoMod.getLogger().error("[TopZurdo] TopZurdoMenuScreen.mouseClicked", t);

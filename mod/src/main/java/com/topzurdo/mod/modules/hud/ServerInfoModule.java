@@ -21,8 +21,8 @@ public class ServerInfoModule extends Module {
     public ServerInfoModule() {
         super("server_info", "Server Info", "Информация о сервере", Category.HUD);
 
-        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 8, 0, 2000));
-        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 78, 0, 2000));
+        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 10, 0, 500));
+        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 50, 0, 500));
         showPing = addSetting(Setting.ofBoolean("show_ping", "Пинг", "Показывать пинг", true));
         showPlayers = addSetting(Setting.ofBoolean("show_players", "Игроки", "Показывать кол-во игроков", true));
     }

@@ -17,7 +17,7 @@ public class CompassHUDModule extends Module {
     public CompassHUDModule() {
         super("compass_hud", "Compass HUD", "Компас", Category.HUD);
 
-        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 6, 0, 2000));
+        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 5, 0, 100));
         showDegrees = addSetting(Setting.ofBoolean("show_degrees", "Градусы", "Показывать градусы", true));
     }
 
