@@ -28,5 +28,15 @@ public final class ModConstants {
         public static final double ITEM_FRAME_PAINTING_CULL_DISTANCE = 32.0;
         public static final double BEHIND_CULL_THRESHOLD = -0.5;
         public static final double BEHIND_CULL_MIN_DISTANCE = 8.0;
+        /** Max particles per tick when FPS Boost limits particles. */
+        public static final int FPS_BOOST_MAX_PARTICLES = 1000;
+        /** Particle cull distance (blocks). */
+        public static final int FPS_BOOST_PARTICLE_CULL_DISTANCE = 32;
+        /** Entity culling: max distance (blocks). */
+        public static final int FPS_BOOST_ENTITY_CULL_DISTANCE = 64;
+        /** Dynamic FPS: target FPS when window is in background. */
+        public static final int FPS_BOOST_BACKGROUND_FPS = 20;
+        /** Default max FPS when focused (0 = vsync/unlimited). */
+        public static final int FPS_BOOST_DEFAULT_MAX_FPS = 0;
     }
 }

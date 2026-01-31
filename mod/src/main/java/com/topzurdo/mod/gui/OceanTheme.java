@@ -100,6 +100,10 @@ public final class OceanTheme {
     public static final int ROW_SLIDER_STEP = 58;
     public static final int ROW_SELECTOR_STEP = 44;
     public static final int SETTINGS_PAD_X = 16;
+    /** Резерв справа под бейдж значения слайдера, чтобы не вылезал за панель */
+    public static final int SLIDER_BADGE_RESERVE = 40;
+    /** Доп. отступ справа в панели настроек, чтобы dropdown и ColorPicker не вылезали за край */
+    public static final int SETTINGS_RIGHT_PADDING = 28;
     public static final int HOVER_DESC_H = 12;
     public static final int SCROLLBAR_WIDTH = 6;
     public static final int SCROLLBAR_THUMB_RADIUS = 3;
@@ -112,4 +116,25 @@ public final class OceanTheme {
     public static final int SETTINGS_PANEL_DEFAULT_WIDTH = 400;
     public static final int SETTINGS_PANEL_MIN_WIDTH = 320;
     public static final int SETTINGS_ROW_MIN_WIDTH = 250;
+
+    // ——— ADAPTIVE (resolution-dependent) ———
+    /** Reference height for adaptive scaling (e.g. 540). */
+    private static final int REF_HEIGHT = 540;
+    /** Reference width for adaptive scaling (e.g. 960). */
+    private static final int REF_WIDTH = 960;
+
+    /** Bottom margin that scales with screen height for different resolutions. */
+    public static int getAdaptiveBottomMargin(int screenHeight) {
+        if (screenHeight <= 0) return BOTTOM_MARGIN;
+        float scale = Math.min(1f, (float) screenHeight / REF_HEIGHT);
+        return Math.max(36, (int) (BOTTOM_MARGIN * scale));
+    }
+
+    /** Scale a base pixel value by screen size (for padding, radii, etc.). */
+    public static int scaleByResolution(int basePx, int screenWidth, int screenHeight) {
+        if (screenWidth <= 0 || screenHeight <= 0) return basePx;
+        float scale = Math.min(1f, Math.min((float) screenWidth / REF_WIDTH, (float) screenHeight / REF_HEIGHT));
+        scale = Math.max(0.6f, scale);
+        return Math.max(1, (int) (basePx * scale));
+    }
 }

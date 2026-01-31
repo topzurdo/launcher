@@ -10,18 +10,23 @@ import com.topzurdo.mod.TopZurdoMod;
 import com.topzurdo.mod.modules.ModuleManager;
 import com.topzurdo.mod.modules.render.SkyComfortModule;
 
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.client.texture.TextureManager;
 import net.minecraft.util.Identifier;
 
 /**
  * SkyComfort: custom sky color, brightness, hide stars, hide sun/moon.
+ * Guards against NPE when dimension/world not ready (e.g. with Sodium, on join).
  */
 @Mixin(WorldRenderer.class)
 public class WorldRendererSkyComfortMixin {
 
     @Inject(method = "renderSky", at = @At("HEAD"))
     private void onRenderSkyHead(net.minecraft.client.util.math.MatrixStack matrices, float tickDelta, CallbackInfo ci) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || client.world == null) return;
+
         ModuleManager mm = TopZurdoMod.getModuleManager();
         if (mm == null) return;
         SkyComfortModule m = (SkyComfortModule) mm.getModule("sky_comfort");

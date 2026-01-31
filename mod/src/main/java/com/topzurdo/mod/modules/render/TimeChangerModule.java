@@ -6,7 +6,7 @@ import com.topzurdo.mod.modules.Setting;
 
 /**
  * Visually change the time of day (client-only).
- * Uses WorldMixin and ClientWorldPropertiesMixin to override getTimeOfDay() — no server modification.
+ * Uses WorldMixin to override World.getTimeOfDay() for ClientWorld — no server modification.
  * Instant change, no flicker.
  */
 public class TimeChangerModule extends Module {

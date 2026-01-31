@@ -119,12 +119,12 @@ public class CustomParticlesModule extends Module {
             double z = mc.player.getZ() + (random.nextDouble() - 0.5) * radius * 2;
 
             ParticleShape shape = getShape(ambientParticleType.getValue());
-            float scale = particleScale.getValue(); // Use same scale setting or add separate? Let's use same for now or default.
-            // Actually ambient particles usually look better small.
+            float scale = particleScale.getValue();
+            int color = particleColor.getValue(); // Тот же цвет, что и у ударов
 
             particles.add(new WorldParticle3D(x, y, z, 0, -0.05 - random.nextDouble() * 0.05, 0)
                 .setShape(shape)
-                .setColor(0xFFFFFFFF) // White for ambient usually
+                .setColor(color)
                 .setScale(scale)
                 .setGravity(0.005f)); // Low gravity for floating feel
         }

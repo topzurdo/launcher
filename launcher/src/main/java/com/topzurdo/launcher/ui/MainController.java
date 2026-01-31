@@ -558,7 +558,7 @@ public class MainController {
         dialog.runScan(() -> {
             onApplyBestSettings();
             dialog.close();
-            showElegantInfo("Готово", "Настройки подобраны под ваш ПК: RAM " + config.getAllocatedRamMb() + " MB, профиль JVM «" + JvmProfile.fromId(config.getJvmProfile()).getDisplayName() + "». Нажмите «Сохранено» или сохраните другие изменения.");
+            Platform.runLater(() -> showElegantInfo("Готово", "Настройки подобраны под ваш ПК: RAM " + config.getAllocatedRamMb() + " MB, профиль JVM «" + JvmProfile.fromId(config.getJvmProfile()).getDisplayName() + "». Нажмите «Сохранено» или сохраните другие изменения."));
         });
     }
 

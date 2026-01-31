@@ -15,5 +15,19 @@
   "topzurdo.module.disabled": "Выключен",
   "topzurdo.log.toggle": "Логирование",
   "topzurdo.log.on": "ВКЛ",
-  "topzurdo.log.off": "ВЫКЛ"
+  "topzurdo.log.off": "ВЫКЛ",
+  "topzurdo.module.fullbright": "FullBright",
+  "topzurdo.module.fullbright.desc": "Максимальная яркость в темноте",
+  "topzurdo.setting.fullbright.brightness": "Яркость",
+  "topzurdo.setting.fullbright.brightness.desc": "Уровень гаммы (1.0 = норма)",
+  "topzurdo.module.fps_boost": "FPS Boost",
+  "topzurdo.module.fps_boost.desc": "Smart FPS Booster: Dynamic FPS, Entity Culling, частицы",
+  "topzurdo.setting.fps_boost.dynamic_fps": "Dynamic FPS",
+  "topzurdo.setting.fps_boost.dynamic_fps.desc": "Снижать FPS в фоне",
+  "topzurdo.setting.fps_boost.entity_culling": "Entity Culling",
+  "topzurdo.setting.fps_boost.entity_culling.desc": "Не рендерить далёкие сущности",
+  "topzurdo.setting.fps_boost.limit_particles": "Лимит частиц",
+  "topzurdo.setting.fps_boost.limit_particles.desc": "Ограничить кол-во частиц",
+  "topzurdo.setting.fps_boost.particle_multiplier": "Кол-во частиц",
+  "topzurdo.setting.fps_boost.particle_multiplier.desc": "Множитель лимита частиц (1 = норма)"
 }

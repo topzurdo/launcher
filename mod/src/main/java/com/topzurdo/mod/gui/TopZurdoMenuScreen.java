@@ -66,6 +66,8 @@ public class TopZurdoMenuScreen extends Screen {
     private long handCursor = 0;
     private boolean moduleScrollbarDragging;
     private boolean settingsScrollbarDragging;
+    /** Cached settings scroll offset used for render; use same value for hit-test in mouse handlers. */
+    private int lastSettingsScrollOffset = 0;
 
     private static final int CARD_H = 52;
     private static final int CARD_GAP = 4;
@@ -95,16 +97,20 @@ public class TopZurdoMenuScreen extends Screen {
             if (client != null) client.openScreen(parent);
             return;
         }
-        // Layout: левая 280px | центр 280px | правая 400px (референс 960×540)
+        // Layout: левая 280px | центр 280px | правая 400px (референс 960×540). Adaptive scale like AdaptiveHUD.
         final int refWidth = 960;
         final int refHeight = 540;
-        uiScaleFactor = Math.min(1.0, Math.min((double) (width - 40) / refWidth, (double) (height - OceanTheme.BOTTOM_MARGIN) / refHeight));
+        int availW = width - 40;
+        int availH = height - OceanTheme.getAdaptiveBottomMargin(height);
+        double scaleByW = (double) availW / refWidth;
+        double scaleByH = (double) availH / refHeight;
+        uiScaleFactor = Math.min(1.0, Math.min(scaleByW, scaleByH));
         uiScaleFactor = Math.max(0.6, uiScaleFactor);
-        guiWidth = (int) (refWidth * uiScaleFactor);
-        guiHeight = (int) (refHeight * uiScaleFactor);
-        categoryPanelWidth = (int) (OceanTheme.SIDEBAR_WIDTH * uiScaleFactor);
-        modulePanelWidth = (int) (OceanTheme.MODULE_PANEL_DEFAULT_WIDTH * uiScaleFactor);
-        settingsPanelWidth = Math.max((int)(OceanTheme.SETTINGS_PANEL_MIN_WIDTH * uiScaleFactor), (int)(OceanTheme.SETTINGS_PANEL_DEFAULT_WIDTH * uiScaleFactor));
+        guiWidth = refWidth;
+        guiHeight = refHeight;
+        categoryPanelWidth = OceanTheme.SIDEBAR_WIDTH;
+        modulePanelWidth = OceanTheme.MODULE_PANEL_DEFAULT_WIDTH;
+        settingsPanelWidth = OceanTheme.SETTINGS_PANEL_DEFAULT_WIDTH;
         if (categoryPanelWidth + modulePanelWidth + settingsPanelWidth + 24 > guiWidth) {
             settingsPanelWidth = Math.max(OceanTheme.SETTINGS_PANEL_MIN_WIDTH, guiWidth - categoryPanelWidth - modulePanelWidth - 24);
         }
@@ -241,7 +247,7 @@ public class TopZurdoMenuScreen extends Screen {
         }
 
         int settingsContentWidth = settingsPanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER;
-        int w = Math.max(OceanTheme.SETTINGS_ROW_MIN_WIDTH, settingsContentWidth - OceanTheme.SETTINGS_PAD_X * 2 - SETTINGS_ROW_EXTRA_PADDING);
+        int w = Math.max(OceanTheme.SETTINGS_ROW_MIN_WIDTH, settingsContentWidth - OceanTheme.SETTINGS_PAD_X * 2 - SETTINGS_ROW_EXTRA_PADDING - OceanTheme.SLIDER_BADGE_RESERVE - OceanTheme.SETTINGS_RIGHT_PADDING);
         String moduleId = selectedModule.getId();
         for (Setting<?> s : selectedModule.getSettings()) {
             if (s == null) continue;
@@ -314,6 +320,12 @@ public class TopZurdoMenuScreen extends Screen {
         int lmx = (int) toLogicalX(mouseX);
         int lmy = (int) toLogicalY(mouseY);
 
+        float pivotX = width / 2f;
+        float pivotY = height / 2f;
+        ms.translate(pivotX, pivotY, 0);
+        ms.scale((float) uiScaleFactor, (float) uiScaleFactor, 1f);
+        ms.translate(-pivotX, -pivotY, 0);
+
         drawOceanPanel(ms, guiLeft, guiTop, guiWidth, guiHeight, categoryPanelWidth);
         drawPanelShadow(ms, guiLeft, guiTop, guiWidth, guiHeight, 1f);
         renderTitleBar(ms);
@@ -383,8 +395,13 @@ public class TopZurdoMenuScreen extends Screen {
     }
 
     private void renderCategoryPanel(MatrixStack ms, int lmx, int lmy, float partialTicks) {
+        int catLeft = guiLeft;
+        int catTop = guiTop + scaledTitleBarH;
+        int catBottom = guiTop + guiHeight - OceanTheme.FOOTER_H - OceanTheme.HOVER_DESC_ZONE;
+        int catH = Math.max(1, catBottom - catTop);
+        applyScissor(catLeft, catTop, categoryPanelWidth, catH);
         int x = guiLeft + OceanTheme.SPACE_8;
-        int y = guiTop + scaledTitleBarH;
+        int y = catTop;
         int catBtnW = categoryPanelWidth - OceanTheme.SPACE_12;
         int catBtnH = 36;
         int catStep = 40;
@@ -394,6 +411,7 @@ public class TopZurdoMenuScreen extends Screen {
             tab.render(ms, lmx, lmy, partialTicks);
             y += catStep;
         }
+        RenderSystem.disableScissor();
     }
 
     private static String iconForCategory(Module.Category c) {
@@ -475,6 +493,7 @@ public class TopZurdoMenuScreen extends Screen {
             DrawableHelper.drawCenteredText(ms, textRenderer, I18n.translate("topzurdo.gui.no_settings"), panelX + headerContentW / 2, baseY + 90, DesignTokens.fgMuted());
         } else {
             int off = settingsScroll.getScrollOffset();
+            lastSettingsScrollOffset = off;
             int adjMy = lmy + off;
             int settingsContentWidth = settingsPanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER;
             int settingsX = panelX + OceanTheme.SETTINGS_PAD_X;
@@ -485,7 +504,7 @@ public class TopZurdoMenuScreen extends Screen {
             ms.translate(0, -off, 0);
             for (SettingRow row : settingRows) {
                 row.setPosition(settingsX, rowY);
-                row.render(ms, lmx, adjMy);
+                row.render(ms, lmx, adjMy, partialTicks);
                 if (isSettingRowHovered(row, lmx, adjMy)) {
                     Setting<?> st = row.getSetting();
                     if (st != null) hoveredDesc = GuiUtil.resolveKey(st.getDescription());
@@ -493,9 +512,9 @@ public class TopZurdoMenuScreen extends Screen {
                 rowY += row.getHeight();
             }
             ms.pop();
+            RenderSystem.disableScissor();
             if (settingsScroll.getMaxScroll() > 0)
                 settingsScroll.renderScrollbar(ms, lmx, lmy);
-            RenderSystem.disableScissor();
             rowY = setContentTop;
             ms.push();
             ms.translate(0, -off, 0);
@@ -521,7 +540,7 @@ public class TopZurdoMenuScreen extends Screen {
 
     private boolean isOverInteractiveComponent(int mx, int my) {
         int localMy = my;
-        int off = settingsScroll != null ? settingsScroll.getScrollOffset() : 0;
+        int off = settingsScroll != null ? lastSettingsScrollOffset : 0;
         int adjMy = localMy + off;
 
         // Categories
@@ -532,15 +551,17 @@ public class TopZurdoMenuScreen extends Screen {
             catY += catStep;
         }
 
-        // Module cards
+        // Module cards (только зона контента, без гуттера скроллбара)
         List<Module> modules = moduleManager != null ? moduleManager.getModulesByCategory(selectedCategory) : java.util.Collections.emptyList();
         int modPanelX = guiLeft + categoryPanelWidth + 6;
+        int modContentWidth = modulePanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER;
+        int modCardRight = modPanelX + 4 + (modContentWidth - 8);
         int modOff = moduleScroll != null ? moduleScroll.getScrollOffset() : 0;
         int modContentTop = guiTop + scaledTitleBarH + scaledModulePanelPadTop;
         int y = modContentTop - modOff;
         for (Module m : modules) {
             ModuleCard card = moduleCards.get(m);
-            if (card != null && mx >= modPanelX + 4 && mx < modPanelX + 4 + (modulePanelWidth - 16) && my >= y && my < y + scaledCardH)
+            if (card != null && mx >= modPanelX + 4 && mx < modCardRight && my >= y && my < y + scaledCardH)
                 return true;
             y += scaledCardH + scaledCardGap;
         }
@@ -641,8 +662,16 @@ public class TopZurdoMenuScreen extends Screen {
         return 1f - (1f - t) * (1f - t) * (1f - t);
     }
 
-    private double toLogicalX(double sx) { return sx; }
-    private double toLogicalY(double sy) { return sy; }
+    private double toLogicalX(double sx) {
+        if (uiScaleFactor == 0) return sx;
+        double pivotX = width / 2.0;
+        return pivotX + (sx - pivotX) / uiScaleFactor;
+    }
+    private double toLogicalY(double sy) {
+        if (uiScaleFactor == 0) return sy;
+        double pivotY = height / 2.0;
+        return pivotY + (sy - pivotY) / uiScaleFactor;
+    }
 
     /** Enable scissor in window pixels. (guiX, guiY, guiW, guiH) — Y down from top. */
     private void applyScissor(int guiX, int guiY, int guiW, int guiH) {
@@ -651,10 +680,16 @@ public class TopZurdoMenuScreen extends Screen {
         int winH = client.getWindow().getHeight();
         double scaleX = (double) winW / (double) width;
         double scaleY = (double) winH / (double) height;
-        int sx = (int) (guiX * scaleX);
-        int sy = (int) ((height - guiY - guiH) * scaleY);
-        int sw = Math.max(0, (int) (guiW * scaleX));
-        int sh = Math.max(0, (int) (guiH * scaleY));
+        double pivotX = width / 2.0;
+        double pivotY = height / 2.0;
+        double scaledX = pivotX + (guiX - pivotX) * uiScaleFactor;
+        double scaledY = pivotY + (guiY - pivotY) * uiScaleFactor;
+        double scaledW = guiW * uiScaleFactor;
+        double scaledH = guiH * uiScaleFactor;
+        int sx = (int) (scaledX * scaleX);
+        int sy = (int) ((height - scaledY - scaledH) * scaleY);
+        int sw = Math.max(0, (int) (scaledW * scaleX));
+        int sh = Math.max(0, (int) (scaledH * scaleY));
         RenderSystem.enableScissor(sx, sy, sw, sh);
     }
 
@@ -666,7 +701,7 @@ public class TopZurdoMenuScreen extends Screen {
         int mx = (int) lx;
         int localMy = (int) ly;
 
-        int off = settingsScroll != null ? settingsScroll.getScrollOffset() : 0;
+        int off = settingsScroll != null ? lastSettingsScrollOffset : 0;
         int adjMy = localMy + off;
         boolean onTextInput = false;
         for (SettingRow row : settingRows) {
@@ -699,10 +734,25 @@ public class TopZurdoMenuScreen extends Screen {
             catY += catStep;
         }
 
+        // Приоритет скроллбара списка модулей: если клик в области гуттера — обрабатываем скроллбар первым
+        int modPanelX = guiLeft + categoryPanelWidth + 6;
+        int modContentWidth = modulePanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER;
+        int modContentTop = guiTop + scaledTitleBarH + scaledModulePanelPadTop;
+        int contentBottom = guiTop + guiHeight - scaledContentBottomOffset;
+        if (button == 0 && moduleScroll != null && moduleScroll.getMaxScroll() > 0
+                && mx >= modPanelX + modContentWidth && mx < modPanelX + modulePanelWidth - 12
+                && localMy >= modContentTop && localMy < contentBottom
+                && moduleScroll.isOverScrollbar(mx, localMy)) {
+            moduleScroll.setOffsetFromScrollbarMouseY(localMy);
+            moduleScrollbarDragging = true;
+            return true;
+        }
+
         List<Module> modules = moduleManager.getModulesByCategory(selectedCategory);
+        int modCardRight = modPanelX + 4 + (modContentWidth - 8);
         for (Module m : modules) {
             ModuleCard card = moduleCards.get(m);
-            if (card != null && card.isMouseOver(mx, localMy)) {
+            if (card != null && card.isMouseOver(mx, localMy) && mx < modCardRight) {
                 if (button == 0) {
                     try { m.toggle(); } catch (Exception e) {
                         if (TopZurdoMod.getInstance() != null) TopZurdoMod.getLogger().error("[TopZurdo] Module toggle: {}", m.getId(), e);
@@ -769,7 +819,8 @@ public class TopZurdoMenuScreen extends Screen {
         if (button == 0 && cfg != null && mx >= footerLogX && mx < footerLogX + footerLogW && localMy >= footerLogY && localMy < footerLogY + footerLogH) {
             cfg.setDebugLogging(!cfg.isDebugLogging());
             String msg = I18n.translate("topzurdo.log.toggle") + " " + I18n.translate(cfg.isDebugLogging() ? "topzurdo.log.on" : "topzurdo.log.off");
-            TopZurdoMod.logEvent(msg);
+            // Always log toggle so "off" is visible (logEvent only logs when debug is on)
+            TopZurdoMod.getLogger().info("[TopZurdo] " + msg);
             return true;
         }
 
@@ -790,7 +841,7 @@ public class TopZurdoMenuScreen extends Screen {
             return true;
         }
         double lx = toLogicalX(mouseX);
-        int adjMy = (int) toLogicalY(mouseY) + (settingsScroll != null ? settingsScroll.getScrollOffset() : 0);
+        int adjMy = (int) toLogicalY(mouseY) + (settingsScroll != null ? lastSettingsScrollOffset : 0);
         for (SettingRow row : settingRows) {
             UIComponent c = row.getControl();
             if (c instanceof Slider) {
@@ -819,7 +870,7 @@ public class TopZurdoMenuScreen extends Screen {
             return true;
         }
         double lx = toLogicalX(mouseX);
-        int adjMy = localMy + (settingsScroll != null ? settingsScroll.getScrollOffset() : 0);
+        int adjMy = localMy + (settingsScroll != null ? lastSettingsScrollOffset : 0);
         for (SettingRow row : settingRows) {
             UIComponent c = row.getControl();
             if (c instanceof Slider) {
@@ -840,14 +891,17 @@ public class TopZurdoMenuScreen extends Screen {
         try {
         int mx = (int) toLogicalX(mouseX);
         int localMy = (int) toLogicalY(mouseY);
-        int off = settingsScroll != null ? settingsScroll.getScrollOffset() : 0;
+        int off = settingsScroll != null ? lastSettingsScrollOffset : 0;
         int adjMy = localMy + off;
         int contentBottom = guiTop + guiHeight - scaledContentBottomOffset;
 
-        int modPanelX = guiLeft + categoryPanelWidth, modPanelW = modulePanelWidth;
-        int modContentTop = guiTop + scaledTitleBarH + scaledModulePanelPadTop;
-        if (mx >= modPanelX && mx < modPanelX + modPanelW && localMy >= modContentTop && localMy < contentBottom) {
-            if (moduleScroll != null) { moduleScroll.addScroll(-delta * SCROLL_DELTA); return true; }
+        // Область панели модулей (включая скроллбар): колёсико крутит список модулей
+        int modPanelX = guiLeft + categoryPanelWidth + 6;
+        int modPanelTop = guiTop + scaledTitleBarH;
+        boolean overModulePanel = mx >= modPanelX && mx < modPanelX + modulePanelWidth && localMy >= modPanelTop && localMy < contentBottom;
+        if (overModulePanel && moduleScroll != null && moduleScroll.getMaxScroll() > 0) {
+            moduleScroll.addScroll(-delta * SCROLL_DELTA);
+            return true;
         }
 
         for (SettingRow row : settingRows) {
@@ -856,7 +910,8 @@ public class TopZurdoMenuScreen extends Screen {
             if (c instanceof Selector && ((Selector) c).mouseScrolled(mx, adjMy, delta)) return true;
         }
 
-        int setPanelX = guiLeft + categoryPanelWidth + modulePanelWidth, setPanelW = settingsPanelWidth;
+        int setPanelX = guiLeft + categoryPanelWidth + modulePanelWidth + 6;
+        int setPanelW = settingsPanelWidth - 12;
         int setContentTop = guiTop + scaledTitleBarH + OceanTheme.SETTINGS_HEADER_H;
         if (mx >= setPanelX && mx < setPanelX + setPanelW && localMy >= setContentTop && localMy < contentBottom) {
             if (settingsScroll != null) { settingsScroll.addScroll(-delta * SCROLL_DELTA); return true; }

@@ -9,6 +9,7 @@
     "GameRendererMixin",
     "HandledScreenAccessor",
     "InGameHudMixin",
+    "LivingEntityMixin",
     "ViewModelMixin",
     "WorldMixin",
     "WorldRendererSkyComfortMixin"

@@ -56,15 +56,14 @@ public class CategoryTab implements com.topzurdo.mod.gui.UIComponent {
         float targetHover = hovered ? 1f : 0f;
         hoverProgress += (targetHover - hoverProgress) * 0.2f;
 
-        // Карточка меню: фон, border-radius 8px
+        // Карточка меню: фон, border-radius 8px. Выбранный — только подсветка фона, без оранжевого столба
         int bgColor = selected ? OceanTheme.BG_ELEVATED : UIRenderHelper.lerpColor(OceanTheme.BG_CARD, OceanTheme.BG_ELEVATED, hoverProgress * 0.5f);
         UIRenderHelper.drawRoundRect(ms, x, y, width, height, OceanTheme.RADIUS_MED, bgColor);
 
-        // Активный элемент: левый бордер 3px + лёгкое свечение
+        // Выбранный: тонкая рамка по контуру вместо столба
         if (selected) {
-            UIRenderHelper.drawRect(ms, x, y + OceanTheme.RADIUS_MED, x + OceanTheme.BORDER_ACTIVE_LEFT, y + height - OceanTheme.RADIUS_MED, OceanTheme.ACCENT);
-            UIRenderHelper.drawRect(ms, x + OceanTheme.BORDER_ACTIVE_LEFT, y, x + OceanTheme.BORDER_ACTIVE_LEFT + 1, y + OceanTheme.RADIUS_MED, OceanTheme.ACCENT);
-            UIRenderHelper.drawRect(ms, x + OceanTheme.BORDER_ACTIVE_LEFT, y + height - OceanTheme.RADIUS_MED, x + OceanTheme.BORDER_ACTIVE_LEFT + 1, y + height, OceanTheme.ACCENT);
+            int borderColor = UIRenderHelper.withAlpha(OceanTheme.ACCENT, 0.5f);
+            UIRenderHelper.drawRoundBorder(ms, x, y, width, height, OceanTheme.RADIUS_MED, 1, borderColor);
         } else if (hoverProgress > 0.01f) {
             int glowColor = UIRenderHelper.withAlpha(OceanTheme.ACCENT, 0.15f * hoverProgress);
             UIRenderHelper.drawRoundBorder(ms, x, y, width, height, OceanTheme.RADIUS_MED, 1, glowColor);

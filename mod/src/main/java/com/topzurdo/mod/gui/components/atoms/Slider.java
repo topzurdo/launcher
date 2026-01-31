@@ -77,14 +77,14 @@ public class Slider implements com.topzurdo.mod.gui.UIComponent {
         UIRenderHelper.drawCircle(ms, thumbCenterX + 1, thumbCenterY + 1, THUMB_RADIUS, 0x40000000);
         UIRenderHelper.drawCircle(ms, thumbCenterX, thumbCenterY, THUMB_RADIUS, com.topzurdo.mod.gui.theme.DesignTokens.fgPrimary());
 
-        // Значение в badge: фон #FF6B35, rounded
+        // Значение в badge: фон #FF6B35, rounded; не выходить за правую границу
         String valueText = showDecimals ? String.format("%.2f", value) : String.format("%.0f", value);
         int badgeW = tr.getWidth(valueText) + 12;
         int badgeH = 16;
         int badgeX = x + sliderWidth + 6;
-        if (badgeX + badgeW > x + width - 4) {
-            badgeX = x + width - badgeW - 4;
-        }
+        int maxBadgeX = x + width - badgeW - 4;
+        if (badgeX > maxBadgeX) badgeX = maxBadgeX;
+        if (badgeX < x + 4) badgeX = x + 4;
         int badgeY = trackY - (badgeH - TRACK_HEIGHT) / 2;
         UIRenderHelper.fillRoundRect(ms, badgeX, badgeY, badgeW, badgeH, 6, OceanTheme.ACCENT);
         tr.draw(ms, valueText, badgeX + 6, badgeY + 4, com.topzurdo.mod.gui.theme.DesignTokens.fgPrimary());

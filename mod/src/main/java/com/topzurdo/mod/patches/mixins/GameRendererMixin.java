@@ -8,6 +8,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.topzurdo.mod.TopZurdoMod;
 import com.topzurdo.mod.modules.ModuleManager;
+import com.topzurdo.mod.modules.render.CustomFOVModule;
 import com.topzurdo.mod.modules.render.NoHurtCamModule;
 import com.topzurdo.mod.modules.render.ZoomModule;
 
@@ -39,20 +40,29 @@ public class GameRendererMixin {
     }
 
     /**
-     * Reduce FOV when Zoom module is active (hold C). getFov(Camera, float, boolean) in 1.16.5 yarn.
+     * Custom FOV and Zoom: override FOV when CustomFOV or Zoom is active.
+     * getFov(Camera, float, boolean) in 1.16.5 yarn.
      */
     @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
     private void onGetFov(Camera camera, float tickDelta, boolean changingFov, CallbackInfoReturnable<Double> cir) {
         ModuleManager mm = TopZurdoMod.getModuleManager();
         if (mm == null) return;
 
-        ZoomModule zoom = (ZoomModule) mm.getModule("zoom");
-        if (zoom == null || !zoom.isEnabled() || !zoom.isZooming()) return;
-
         double baseFov = cir.getReturnValue();
-        float factor = zoom.getZoomFactor();
-        if (factor > 0f) {
-            cir.setReturnValue(baseFov / (double) factor);
+
+        ZoomModule zoom = (ZoomModule) mm.getModule("zoom");
+        if (zoom != null && zoom.isEnabled() && zoom.isZooming()) {
+            float factor = zoom.getZoomFactor();
+            if (factor > 0f) {
+                cir.setReturnValue(baseFov / (double) factor);
+            }
+            return;
         }
+
+        CustomFOVModule customFov = (CustomFOVModule) mm.getModule("custom_fov");
+        if (customFov == null || !customFov.isEnabled()) return;
+
+        int targetFov = Math.max(30, Math.min(140, customFov.getBaseFov()));
+        cir.setReturnValue((double) targetFov);
     }
 }

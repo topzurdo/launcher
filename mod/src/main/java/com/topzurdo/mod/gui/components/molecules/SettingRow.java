@@ -23,7 +23,7 @@ public class SettingRow implements com.topzurdo.mod.gui.UIComponent {
     private int x, y, width, height;
     private static final int DEFAULT_HEIGHT = 36;
     private static final int MIN_ROW_WIDTH = 250;
-    private static final int LABEL_ZONE_WIDTH = 120;
+    private static final int LABEL_ZONE_WIDTH = 130;
     private static final int CONTROL_GAP = 12;
     private static final int MIN_CONTROL_WIDTH = 118;
     /** Vertical layout: label on first line, control full width on second. */
@@ -218,7 +218,24 @@ public class SettingRow implements com.topzurdo.mod.gui.UIComponent {
     }
 
     public void tick() {
-        if (toggle != null) toggle.tick();
+        if (toggle != null) {
+            toggle.setValue((Boolean) setting.getValue());
+            toggle.tick();
+        }
+        if (slider != null && setting.isFloat() && setting.hasRange()) {
+            slider.setValue(((Setting<Float>) setting).getValue());
+        }
+        if (slider != null && setting.isInteger() && setting.hasRange()) {
+            slider.setValue(((Setting<Integer>) setting).getValue().floatValue());
+        }
+        if (selector != null && setting.isOptions()) {
+            String v = ((Setting<String>) setting).getValue();
+            if (v != null && !v.equals(selector.getValue())) selector.setValue(v);
+        }
+        if (colorPicker != null && setting.isColor()) {
+            int cv = setting.getValue() instanceof Integer ? (Integer) setting.getValue() : 0xFFFFFFFF;
+            if (colorPicker.getValue() != cv) colorPicker.setValue(cv);
+        }
     }
 
     public int getX() { return x; }

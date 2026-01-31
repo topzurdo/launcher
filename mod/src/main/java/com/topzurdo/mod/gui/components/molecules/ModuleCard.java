@@ -102,13 +102,17 @@ public class ModuleCard implements com.topzurdo.mod.gui.UIComponent {
         int textColor = UIRenderHelper.withAlpha(com.topzurdo.mod.gui.theme.DesignTokens.fgPrimary(), alphaMultiplier);
         int mutedColor = UIRenderHelper.withAlpha(com.topzurdo.mod.gui.theme.DesignTokens.fgMuted(), alphaMultiplier);
 
-        // Padding 16px
+        // Место под toggle справа (46px), отступ 8px от края контента
+        final int toggleZone = 46 + OceanTheme.SPACE_8;
         int pad = OceanTheme.SPACE_16;
-        tr.draw(ms, title != null ? title : "", x + pad, drawY + pad, textColor);
+        int textMaxW = Math.max(60, width - pad * 2 - toggleZone);
+        String titleStr = title != null ? title : "";
+        if (tr.getWidth(titleStr) > textMaxW) titleStr = GuiUtil.truncate(tr, titleStr, textMaxW);
+        tr.draw(ms, titleStr, x + pad, drawY + pad, textColor);
 
         // Описание: полная ширина минус toggle и отступы, перенос по словам (до 2 строк)
         String desc = description != null ? description : "";
-        int descMaxW = Math.max(80, width - pad * 2 - 46);
+        int descMaxW = Math.max(80, width - pad * 2 - toggleZone);
         java.util.List<String> descLines = GuiUtil.wrapHint(tr, desc, descMaxW);
         int lineHeight = tr.fontHeight + 2;
         int maxDescLines = 2;
@@ -116,9 +120,9 @@ public class ModuleCard implements com.topzurdo.mod.gui.UIComponent {
             tr.draw(ms, descLines.get(i), x + pad, drawY + pad + 12 + i * lineHeight, mutedColor);
         }
 
-        // Toggle по вертикали по центру карточки (логическая y для hit-test)
+        // Toggle по вертикали по центру карточки, справа с отступом
         int toggleY = y + (height - 18) / 2;
-        toggle.setPosition(x + width - 46, toggleY);
+        toggle.setPosition(x + width - toggleZone + OceanTheme.SPACE_8, toggleY);
         toggle.setValue(enabled);
         // Рисуем toggle со смещением по Y для визуального подъёма
         ms.push();

@@ -150,8 +150,9 @@ public class ScrollContainer {
         int scrollbarY = maxScrollRange <= 0 ? y : y + (int) ((getScrollOffset() / (float) getMaxScroll()) * maxScrollRange);
         scrollbarY = Math.max(y, Math.min(y + height - scrollbarHeight, scrollbarY));
 
-        // Track (rounded)
-        UIRenderHelper.fillRoundRect(ms, scrollbarX, y, barW, height, TRACK_RADIUS, OceanTheme.BG_ELEVATED);
+        // Дорожка (track) — видимая область скролла
+        int trackColor = UIRenderHelper.withAlpha(OceanTheme.BG_ELEVATED, 0.9f);
+        UIRenderHelper.fillRoundRect(ms, scrollbarX, y, barW, height, TRACK_RADIUS, trackColor);
 
         // Thumb (rounded, hover highlight)
         boolean overThumb = isOverThumb(mouseX, mouseY);

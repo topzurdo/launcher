@@ -203,6 +203,12 @@ public class TopZurdoClientMod implements ClientModInitializer {
                 if (particles != null && particles.isEnabled() && particles instanceof com.topzurdo.mod.modules.render.CustomParticlesModule) {
                     ((com.topzurdo.mod.modules.render.CustomParticlesModule) particles).onWorldRender(matrices, tickDelta);
                 }
+
+                // Damage Numbers
+                com.topzurdo.mod.modules.Module damageNumbers = moduleManager.getModule("damage_numbers");
+                if (damageNumbers != null && damageNumbers.isEnabled() && damageNumbers instanceof com.topzurdo.mod.modules.render.DamageNumbersModule) {
+                    ((com.topzurdo.mod.modules.render.DamageNumbersModule) damageNumbers).onWorldRender(matrices, tickDelta);
+                }
             }
         });
 
@@ -385,7 +391,7 @@ public class TopZurdoClientMod implements ClientModInitializer {
         return null;
     }
 
-    /** Set HUD module position (pos_x, pos_y). For compass_hud only pos_y is updated. */
+    /** Set HUD module position (pos_x, pos_y). Respects each setting's min/max. For compass_hud only pos_y is updated. */
     private void setHudModulePosition(com.topzurdo.mod.modules.Module m, int x, int y) {
         String id = m.getId();
         boolean compassOnly = "compass_hud".equals(id);
@@ -393,12 +399,16 @@ public class TopZurdoClientMod implements ClientModInitializer {
             if ("pos_x".equals(s.getKey()) && !compassOnly) {
                 @SuppressWarnings("unchecked")
                 com.topzurdo.mod.modules.Setting<Integer> si = (com.topzurdo.mod.modules.Setting<Integer>) s;
-                si.setValue(Math.max(0, Math.min(2000, x)));
+                int min = si.getMin() != null ? si.getMin().intValue() : 0;
+                int max = si.getMax() != null ? si.getMax().intValue() : 2000;
+                si.setValue(Math.max(min, Math.min(max, x)));
                 s.save(id);
             } else if ("pos_y".equals(s.getKey())) {
                 @SuppressWarnings("unchecked")
                 com.topzurdo.mod.modules.Setting<Integer> si = (com.topzurdo.mod.modules.Setting<Integer>) s;
-                si.setValue(Math.max(0, Math.min(2000, y)));
+                int min = si.getMin() != null ? si.getMin().intValue() : 0;
+                int max = si.getMax() != null ? si.getMax().intValue() : 2000;
+                si.setValue(Math.max(min, Math.min(max, y)));
                 s.save(id);
             }
         }

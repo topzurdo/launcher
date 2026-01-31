@@ -15,5 +15,19 @@
   "topzurdo.module.disabled": "Disabled",
   "topzurdo.log.toggle": "Logging",
   "topzurdo.log.on": "ON",
-  "topzurdo.log.off": "OFF"
+  "topzurdo.log.off": "OFF",
+  "topzurdo.module.fullbright": "FullBright",
+  "topzurdo.module.fullbright.desc": "Maximum brightness in darkness",
+  "topzurdo.setting.fullbright.brightness": "Brightness",
+  "topzurdo.setting.fullbright.brightness.desc": "Gamma level (1.0 = normal)",
+  "topzurdo.module.fps_boost": "FPS Boost",
+  "topzurdo.module.fps_boost.desc": "Smart FPS Booster: Dynamic FPS, Entity Culling, particles",
+  "topzurdo.setting.fps_boost.dynamic_fps": "Dynamic FPS",
+  "topzurdo.setting.fps_boost.dynamic_fps.desc": "Lower FPS when window is in background",
+  "topzurdo.setting.fps_boost.entity_culling": "Entity Culling",
+  "topzurdo.setting.fps_boost.entity_culling.desc": "Don't render distant entities",
+  "topzurdo.setting.fps_boost.limit_particles": "Limit Particles",
+  "topzurdo.setting.fps_boost.limit_particles.desc": "Cap particle count",
+  "topzurdo.setting.fps_boost.particle_multiplier": "Particle Amount",
+  "topzurdo.setting.fps_boost.particle_multiplier.desc": "Particle limit multiplier (1 = normal)"
 }

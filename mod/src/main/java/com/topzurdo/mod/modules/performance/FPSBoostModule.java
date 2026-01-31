@@ -9,7 +9,10 @@ import java.util.WeakHashMap;
 import com.topzurdo.mod.ModConstants;
 import com.topzurdo.mod.TopZurdoMod;
 import com.topzurdo.mod.modules.Module;
+import com.topzurdo.mod.modules.Setting;
 import com.topzurdo.mod.modules.render.CustomParticlesModule;
+
+import org.lwjgl.glfw.GLFW;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.AoMode;
@@ -24,8 +27,8 @@ import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 
 /**
- * FPS Boost — единый модуль оптимизации.
- * Без настроек: при включении автоматически применяет оптимальные параметры.
+ * FPS Boost — Smart FPS Booster: Dynamic FPS (background), Entity Culling, particle limits.
+ * Automatically optimizes settings based on gameplay.
  */
 @SuppressWarnings("rawtypes")
 public class FPSBoostModule extends Module {
@@ -48,9 +51,14 @@ public class FPSBoostModule extends Module {
     private static volatile int particlesThisTick = 0;
     private static long lastResetTick = -1;
 
-    private static final int MAX_PARTICLES = 1000;
-    private static final int CULL_DISTANCE = 32;
-    private static final int MAX_ENTITY_DISTANCE = 64;
+    private Setting<Boolean> dynamicFps;
+    private Setting<Boolean> entityCulling;
+    private Setting<Boolean> limitParticles;
+    private Setting<Float> particleMultiplier;
+
+    private int maxParticles = ModConstants.Performance.FPS_BOOST_MAX_PARTICLES;
+    private int cullDistance = ModConstants.Performance.FPS_BOOST_PARTICLE_CULL_DISTANCE;
+    private int maxEntityDistance = ModConstants.Performance.FPS_BOOST_ENTITY_CULL_DISTANCE;
 
     private GraphicsMode originalGraphics;
     private ParticlesMode originalParticles;
@@ -58,6 +66,7 @@ public class FPSBoostModule extends Module {
     private Integer originalMipmap;
     private AoMode originalAmbientOcclusion;
     private Integer originalRenderDistance;
+    private Integer originalMaxFps;
 
     private final Map<Entity, CullResult> cullCache = new WeakHashMap<>();
     private long lastCacheClearTick = 0;
@@ -69,7 +78,11 @@ public class FPSBoostModule extends Module {
     }
 
     public FPSBoostModule() {
-        super("fps_boost", "FPS Boost", "Оптимизация FPS (авто)", Category.PERFORMANCE);
+        super("fps_boost", "FPS Boost", "Smart FPS Booster: Dynamic FPS, Entity Culling, particles", Category.PERFORMANCE);
+        dynamicFps = addSetting(Setting.ofBoolean("dynamic_fps", "Dynamic FPS", "Снижать FPS в фоне", true));
+        entityCulling = addSetting(Setting.ofBoolean("entity_culling", "Entity Culling", "Не рендерить далёкие сущности", true));
+        limitParticles = addSetting(Setting.ofBoolean("limit_particles", "Limit Particles", "Ограничить кол-во частиц", true));
+        particleMultiplier = addSetting(Setting.ofFloat("particle_multiplier", "Particle Amount", "Множитель лимита частиц (1 = норма)", 1.0f, 0.25f, 2.0f));
     }
 
     public static boolean isCustomParticlesEnabled() {
@@ -101,9 +114,15 @@ public class FPSBoostModule extends Module {
     public static int getParticleCountThisTick() { return particlesThisTick; }
     public static void incrementParticleCount() { particlesThisTick++; }
 
-    public boolean isLimitParticlesEnabled() { return isEnabled(); }
-    public int getMaxParticles() { return isEnabled() ? MAX_PARTICLES : Integer.MAX_VALUE; }
-    public int getCullDistance() { return CULL_DISTANCE; }
+    public boolean isLimitParticlesEnabled() {
+        return isEnabled() && (limitParticles == null || limitParticles.getValue());
+    }
+    public int getMaxParticles() {
+        if (!isEnabled()) return Integer.MAX_VALUE;
+        float mult = particleMultiplier != null ? particleMultiplier.getValue() : 1.0f;
+        return (int) (maxParticles * mult);
+    }
+    public int getCullDistance() { return cullDistance; }
 
     public boolean shouldSpawnParticle(ParticleEffect data, double x, double y, double z) {
         if (!isLimitParticlesEnabled()) return true;
@@ -115,7 +134,7 @@ public class FPSBoostModule extends Module {
         double dx = x - mc.player.getX();
         double dy = y - mc.player.getY();
         double dz = z - mc.player.getZ();
-        if (Math.sqrt(dx * dx + dy * dy + dz * dz) > CULL_DISTANCE) return false;
+        if (Math.sqrt(dx * dx + dy * dy + dz * dz) > cullDistance) return false;
 
         if (AMBIENT_PARTICLE_TYPES.contains(data.getType())) return Math.random() > 0.3;
         if (data.getType() == ParticleTypes.EXPLOSION || data.getType() == ParticleTypes.EXPLOSION_EMITTER)
@@ -124,7 +143,9 @@ public class FPSBoostModule extends Module {
         return true;
     }
 
-    public boolean isEntityCullingEnabled() { return isEnabled(); }
+    public boolean isEntityCullingEnabled() {
+        return isEnabled() && (entityCulling == null || entityCulling.getValue());
+    }
 
     public boolean shouldCullEntity(Entity entity) {
         if (!isEntityCullingEnabled()) return false;
@@ -146,7 +167,7 @@ public class FPSBoostModule extends Module {
         double dist = camPos.distanceTo(entPos);
 
         boolean cull = false;
-        if (dist > MAX_ENTITY_DISTANCE) cull = true;
+        if (dist > maxEntityDistance) cull = true;
         else {
             Box bb = entity.getBoundingBox();
             double size = Math.max(bb.getXLength(), Math.max(bb.getYLength(), bb.getZLength()));
@@ -175,6 +196,7 @@ public class FPSBoostModule extends Module {
             originalMipmap = mc.options.mipmapLevels;
             originalAmbientOcclusion = mc.options.ao;
             originalRenderDistance = mc.options.viewDistance;
+            originalMaxFps = mc.options.maxFps;
             apply();
         }
     }
@@ -190,6 +212,26 @@ public class FPSBoostModule extends Module {
         if (originalMipmap != null) mc.options.mipmapLevels = originalMipmap;
         if (originalAmbientOcclusion != null) mc.options.ao = originalAmbientOcclusion;
         if (originalRenderDistance != null) mc.options.viewDistance = originalRenderDistance;
+        if (originalMaxFps != null) mc.options.maxFps = originalMaxFps;
+    }
+
+    @Override
+    public void onTick() {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc == null || mc.options == null || !isEnabled()) return;
+        boolean focused = isWindowFocused(mc);
+        if (dynamicFps != null && dynamicFps.getValue()) {
+            mc.options.maxFps = focused ? (originalMaxFps != null ? originalMaxFps : ModConstants.Performance.FPS_BOOST_DEFAULT_MAX_FPS)
+                : ModConstants.Performance.FPS_BOOST_BACKGROUND_FPS;
+        } else if (focused && originalMaxFps != null) {
+            mc.options.maxFps = originalMaxFps;
+        }
+    }
+
+    private static boolean isWindowFocused(MinecraftClient mc) {
+        if (mc.getWindow() == null) return true;
+        long handle = mc.getWindow().getHandle();
+        return handle == 0 || GLFW.glfwGetWindowAttrib(handle, GLFW.GLFW_FOCUSED) == GLFW.GLFW_TRUE;
     }
 
     private void apply() {
@@ -202,5 +244,7 @@ public class FPSBoostModule extends Module {
         mc.options.cloudRenderMode = CloudRenderMode.OFF;
         if (mc.options.mipmapLevels > 2) mc.options.mipmapLevels = 2;
         mc.options.ao = AoMode.OFF;
+        if (dynamicFps != null && dynamicFps.getValue() && !isWindowFocused(mc))
+            mc.options.maxFps = ModConstants.Performance.FPS_BOOST_BACKGROUND_FPS;
     }
 }
