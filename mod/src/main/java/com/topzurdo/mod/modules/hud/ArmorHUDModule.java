@@ -20,9 +20,14 @@ public class ArmorHUDModule extends Module {
     public ArmorHUDModule() {
         super("armor_hud", "Armor HUD", "Отображение брони", Category.HUD);
 
-        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 10, 0, 500));
-        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 100, 0, 500));
+        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 10, 0, 2000));
+        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 10, 0, 2000));
         showDurability = addSetting(Setting.ofBoolean("show_durability", "Прочность", "Показывать прочность", true));
+    }
+
+    @Override
+    public int[] getHudBounds() {
+        return new int[] { posX.getValue(), posY.getValue(), 80, 90 };
     }
 
     @Override

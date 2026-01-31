@@ -4,10 +4,16 @@
   "topzurdo.gui.select_module": "Select a module",
   "topzurdo.gui.no_settings": "No settings",
   "topzurdo.gui.footer": "TopZurdo v1.0.0 • Minecraft 1.16.5",
+  "topzurdo.gui.debug_logging.on": "Debug logging: ON",
+  "topzurdo.gui.debug_logging.off": "Debug logging: OFF",
+  "topzurdo.gui.cloth_config": "Cloth Config",
   "topzurdo.gui.category.render": "Render",
   "topzurdo.gui.category.hud": "HUD",
   "topzurdo.gui.category.utility": "Utility",
   "topzurdo.gui.category.performance": "Performance",
   "topzurdo.module.enabled": "Enabled",
-  "topzurdo.module.disabled": "Disabled"
+  "topzurdo.module.disabled": "Disabled",
+  "topzurdo.log.toggle": "Logging",
+  "topzurdo.log.on": "ON",
+  "topzurdo.log.off": "OFF"
 }

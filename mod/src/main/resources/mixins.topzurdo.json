@@ -10,7 +10,8 @@
     "HandledScreenAccessor",
     "InGameHudMixin",
     "ViewModelMixin",
-    "WorldMixin"
+    "WorldMixin",
+    "WorldRendererSkyComfortMixin"
   ],
   "server": [],
   "injectors": {
