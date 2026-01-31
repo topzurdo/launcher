@@ -22,10 +22,15 @@ public class TargetInfoModule extends Module {
     public TargetInfoModule() {
         super("target_info", "Target Info", "Информация о цели", Category.HUD);
 
-        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 8, 0, 2000));
-        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 108, 0, 2000));
+        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 450, 0, 2000));
+        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 200, 0, 2000));
         showHealth = addSetting(Setting.ofBoolean("show_health", "Здоровье", "Показывать здоровье", true));
         showDistance = addSetting(Setting.ofBoolean("show_distance", "Дистанция", "Показывать расстояние", true));
+    }
+
+    @Override
+    public int[] getHudBounds() {
+        return new int[] { posX.getValue(), posY.getValue(), 120, 40 };
     }
 
     @Override

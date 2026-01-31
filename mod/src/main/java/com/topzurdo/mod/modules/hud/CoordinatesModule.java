@@ -20,11 +20,18 @@ public class CoordinatesModule extends Module {
     public CoordinatesModule() {
         super("coordinates", "Coordinates", "Координаты игрока", Category.HUD);
 
-        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 8, 0, 2000));
-        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 8, 0, 2000));
+        posX = addSetting(Setting.ofInt("pos_x", "Позиция X", "Горизонтальная позиция", 10, 0, 2000));
+        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 380, 0, 2000));
         showNether = addSetting(Setting.ofBoolean("show_nether", "Координаты Незера", "Показывать координаты для Незера", true));
         showBiome = addSetting(Setting.ofBoolean("show_biome", "Биом", "Показывать текущий биом", false));
         showDirection = addSetting(Setting.ofBoolean("show_direction", "Направление", "Показывать направление", true));
+    }
+
+    @Override
+    public int[] getHudBounds() {
+        int x = posX.getValue();
+        int y = posY.getValue();
+        return new int[] { x, y, 180, 40 };
     }
 
     @Override

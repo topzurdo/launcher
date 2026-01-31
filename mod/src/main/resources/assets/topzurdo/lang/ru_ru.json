@@ -4,13 +4,16 @@
   "topzurdo.gui.select_module": "Выберите модуль",
   "topzurdo.gui.no_settings": "Нет настроек",
   "topzurdo.gui.footer": "TopZurdo v1.0.0 • Minecraft 1.16.5",
+  "topzurdo.gui.debug_logging.on": "Отладочные логи: ВКЛ",
+  "topzurdo.gui.debug_logging.off": "Отладочные логи: ВЫКЛ",
   "topzurdo.gui.cloth_config": "Cloth Config",
-  "topzurdo.gui.debug_logging.on": "Отладка: ВКЛ",
-  "topzurdo.gui.debug_logging.off": "Отладка: ВЫКЛ",
   "topzurdo.gui.category.render": "Рендер",
   "topzurdo.gui.category.hud": "HUD",
   "topzurdo.gui.category.utility": "Утилиты",
   "topzurdo.gui.category.performance": "Производительность",
   "topzurdo.module.enabled": "Включён",
-  "topzurdo.module.disabled": "Выключен"
+  "topzurdo.module.disabled": "Выключен",
+  "topzurdo.log.toggle": "Логирование",
+  "topzurdo.log.on": "ВКЛ",
+  "topzurdo.log.off": "ВЫКЛ"
 }

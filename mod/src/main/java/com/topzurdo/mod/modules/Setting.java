@@ -155,6 +155,25 @@ public class Setting<T> {
                 value = defaultValue;
             }
         }
+        // Clamp numeric values to min/max so legacy configs stay on-screen
+        if (minValue != null && maxValue != null) {
+            if (value instanceof Integer) {
+                int v = (Integer) value;
+                int min = (Integer) minValue;
+                int max = (Integer) maxValue;
+                value = (T) Integer.valueOf(Math.max(min, Math.min(max, v)));
+            } else if (value instanceof Float) {
+                float v = (Float) value;
+                float min = (Float) minValue;
+                float max = (Float) maxValue;
+                value = (T) Float.valueOf(Math.max(min, Math.min(max, v)));
+            } else if (value instanceof Double) {
+                double v = (Double) value;
+                double min = (Double) minValue;
+                double max = (Double) maxValue;
+                value = (T) Double.valueOf(Math.max(min, Math.min(max, v)));
+            }
+        }
         // For options: ensure loaded value is in the list
         if (options != null && !options.isEmpty() && value instanceof String) {
             String s = (String) value;

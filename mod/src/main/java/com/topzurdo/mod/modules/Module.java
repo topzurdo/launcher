@@ -83,6 +83,14 @@ public abstract class Module {
     public void onTick() {}
     public void onRender(float partialTicks) {}
 
+    /**
+     * For HUD modules with pos_x/pos_y: return [x, y, width, height] for hit-test and drag.
+     * Default returns null (not draggable).
+     */
+    public int[] getHudBounds() {
+        return null;
+    }
+
     public enum Category {
         RENDER("Render", "Visual modifications"),
         HUD("HUD", "Heads-up display"),

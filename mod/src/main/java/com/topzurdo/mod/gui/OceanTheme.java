@@ -110,6 +110,6 @@ public final class OceanTheme {
     public static final int MODULE_PANEL_DEFAULT_WIDTH = 280;
     /** Ширина правой панели настроек */
     public static final int SETTINGS_PANEL_DEFAULT_WIDTH = 400;
-    public static final int SETTINGS_PANEL_MIN_WIDTH = 360;
-    public static final int SETTINGS_ROW_MIN_WIDTH = 280;
+    public static final int SETTINGS_PANEL_MIN_WIDTH = 320;
+    public static final int SETTINGS_ROW_MIN_WIDTH = 250;
 }

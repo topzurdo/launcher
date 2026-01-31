@@ -17,8 +17,18 @@ public class CompassHUDModule extends Module {
     public CompassHUDModule() {
         super("compass_hud", "Compass HUD", "Компас", Category.HUD);
 
-        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 6, 0, 2000));
+        posY = addSetting(Setting.ofInt("pos_y", "Позиция Y", "Вертикальная позиция", 5, 0, 500));
         showDegrees = addSetting(Setting.ofBoolean("show_degrees", "Градусы", "Показывать градусы", true));
+    }
+
+    @Override
+    public int[] getHudBounds() {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.getWindow() == null) return null;
+        int w = mc.getWindow().getScaledWidth();
+        int cx = w / 2;
+        int y = posY.getValue();
+        return new int[] { cx - 40, y, 80, 30 };
     }
 
     @Override

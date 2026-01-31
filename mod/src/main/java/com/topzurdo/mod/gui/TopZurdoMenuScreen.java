@@ -72,6 +72,10 @@ public class TopZurdoMenuScreen extends Screen {
     private static final int SCROLL_DELTA = 25;
     private static final int TITLE_BAR_H = 48;
     private static final int MODULE_PANEL_PAD_TOP = 14;
+    private static final int SETTINGS_ROW_EXTRA_PADDING = 12;
+
+    /** Footer debug-logging button bounds (computed in init). */
+    private int footerLogX, footerLogY, footerLogW, footerLogH;
 
     public TopZurdoMenuScreen() {
         this(null);
@@ -140,6 +144,16 @@ public class TopZurdoMenuScreen extends Screen {
 
         selectRestoredModule();
         restoreScrollOffsets();
+
+        int footerRowTop = guiTop + guiHeight - OceanTheme.FOOTER_H;
+        String logOn = I18n.translate("topzurdo.gui.debug_logging.on");
+        String logOff = I18n.translate("topzurdo.gui.debug_logging.off");
+        int logW1 = client != null && client.textRenderer != null ? client.textRenderer.getWidth(logOn) : 120;
+        int logW2 = client != null && client.textRenderer != null ? client.textRenderer.getWidth(logOff) : 120;
+        footerLogW = Math.max(logW1, logW2) + OceanTheme.SPACE_12 * 2;
+        footerLogH = 20;
+        footerLogX = guiLeft + guiWidth - footerLogW - OceanTheme.SPACE_12;
+        footerLogY = footerRowTop + (OceanTheme.FOOTER_H - footerLogH) / 2;
 
         handCursor = GLFW.glfwCreateStandardCursor(GLFW.GLFW_HAND_CURSOR);
         } catch (Throwable t) {
@@ -227,7 +241,7 @@ public class TopZurdoMenuScreen extends Screen {
         }
 
         int settingsContentWidth = settingsPanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER;
-        int w = Math.max(OceanTheme.SETTINGS_ROW_MIN_WIDTH, settingsContentWidth - OceanTheme.SETTINGS_PAD_X * 2);
+        int w = Math.max(OceanTheme.SETTINGS_ROW_MIN_WIDTH, settingsContentWidth - OceanTheme.SETTINGS_PAD_X * 2 - SETTINGS_ROW_EXTRA_PADDING);
         String moduleId = selectedModule.getId();
         for (Setting<?> s : selectedModule.getSettings()) {
             if (s == null) continue;
@@ -306,10 +320,7 @@ public class TopZurdoMenuScreen extends Screen {
         renderCategoryPanel(ms, lmx, lmy, partialTicks);
 
         int contentBottom = guiTop + guiHeight - scaledContentBottomOffset;
-        int sepH = Math.max(0, contentBottom - (guiTop + scaledTitleBarH));
-        drawVerticalLine(ms, guiLeft + categoryPanelWidth, guiTop + scaledTitleBarH, sepH);
         renderModulePanel(ms, lmx, lmy, contentBottom, eased, rawCat, partialTicks);
-        drawVerticalLine(ms, guiLeft + categoryPanelWidth + modulePanelWidth, guiTop + scaledTitleBarH, sepH);
 
         renderSettingsPanel(ms, lmx, lmy, contentBottom, eased, partialTicks);
         renderFooter(ms, lmx, lmy);
@@ -545,7 +556,6 @@ public class TopZurdoMenuScreen extends Screen {
                 return true;
         }
 
-        // Footer buttons
         return false;
     }
 
@@ -562,12 +572,21 @@ public class TopZurdoMenuScreen extends Screen {
 
     private void renderFooter(MatrixStack ms, int mouseX, int mouseY) {
         int footerRowTop = guiTop + guiHeight - OceanTheme.FOOTER_H;
-        int hintMaxW = guiWidth - OceanTheme.SPACE_32;
+        int hintMaxW = guiWidth - OceanTheme.SPACE_24 - (footerLogW + OceanTheme.SPACE_12);
         List<String> lines = GuiUtil.wrapHint(textRenderer, I18n.translate("topzurdo.gui.footer"), hintMaxW);
         int hoverZoneTop = guiTop + guiHeight - scaledContentBottomOffset;
         int fy = lines.size() > 1 ? hoverZoneTop + 6 : footerRowTop + (OceanTheme.FOOTER_H - 9) / 2;
         for (int i = 0; i < lines.size(); i++)
             textRenderer.drawWithShadow(ms, lines.get(i), guiLeft + OceanTheme.SPACE_12, fy + i * 10, DesignTokens.fgMuted());
+
+        ModConfig cfg = TopZurdoMod.getConfig();
+        boolean debugOn = cfg != null && cfg.isDebugLogging();
+        String logLabel = I18n.translate(debugOn ? "topzurdo.gui.debug_logging.on" : "topzurdo.gui.debug_logging.off");
+        boolean hover = mouseX >= footerLogX && mouseX < footerLogX + footerLogW && mouseY >= footerLogY && mouseY < footerLogY + footerLogH;
+        int btnBg = hover ? UIRenderHelper.withAlpha(OceanTheme.ACCENT, 0.25f) : UIRenderHelper.withAlpha(OceanTheme.BG_CARD, 0.9f);
+        UIRenderHelper.fill(ms, footerLogX, footerLogY, footerLogX + footerLogW, footerLogY + footerLogH, btnBg);
+        UIRenderHelper.drawGlowingBorder(ms, footerLogX, footerLogY, footerLogW, footerLogH, UIRenderHelper.withAlpha(OceanTheme.NEON_PURPLE, hover ? 0.6f : 0.35f), 1);
+        textRenderer.drawWithShadow(ms, logLabel, footerLogX + (footerLogW - textRenderer.getWidth(logLabel)) / 2, footerLogY + (footerLogH - 9) / 2, debugOn ? OceanTheme.ACCENT : DesignTokens.fgMuted());
     }
 
     private void drawOceanPanel(MatrixStack ms, int x, int y, int w, int h, int catW) {
@@ -743,6 +762,14 @@ public class TopZurdoMenuScreen extends Screen {
         if (button == 0 && settingsScroll != null && settingsScroll.getMaxScroll() > 0 && settingsScroll.isOverScrollbar(mx, localMy)) {
             settingsScroll.setOffsetFromScrollbarMouseY(localMy);
             settingsScrollbarDragging = true;
+            return true;
+        }
+
+        ModConfig cfg = TopZurdoMod.getConfig();
+        if (button == 0 && cfg != null && mx >= footerLogX && mx < footerLogX + footerLogW && localMy >= footerLogY && localMy < footerLogY + footerLogH) {
+            cfg.setDebugLogging(!cfg.isDebugLogging());
+            String msg = I18n.translate("topzurdo.log.toggle") + " " + I18n.translate(cfg.isDebugLogging() ? "topzurdo.log.on" : "topzurdo.log.off");
+            TopZurdoMod.logEvent(msg);
             return true;
         }
 
