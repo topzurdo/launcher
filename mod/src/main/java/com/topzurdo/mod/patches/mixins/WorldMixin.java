@@ -6,6 +6,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.topzurdo.mod.TopZurdoMod;
+import com.topzurdo.mod.modules.render.TimeChangerModule;
 import com.topzurdo.mod.modules.render.WeatherControlModule;
 
 import net.minecraft.client.world.ClientWorld;
@@ -13,12 +14,22 @@ import net.minecraft.world.World;
 
 /**
  * World mixin for client-side overrides:
+ * - getTimeOfDay: TimeChanger module (sky uses World.getTimeOfDay())
  * - getRainGradient/getThunderGradient: WeatherControl module
  * Only applies to ClientWorld instances.
- * Note: TimeChanger uses ClientWorldPropertiesMixin instead.
  */
 @Mixin(World.class)
 public class WorldMixin {
+
+    @Inject(method = "getTimeOfDay", at = @At("HEAD"), cancellable = true)
+    private void onGetTimeOfDay(CallbackInfoReturnable<Long> cir) {
+        if (!((Object) this instanceof ClientWorld)) return;
+        if (TopZurdoMod.getModuleManager() == null) return;
+        TimeChangerModule m = (TimeChangerModule) TopZurdoMod.getModuleManager().getModule("time_changer");
+        if (m == null || !m.isEnabled()) return;
+        long override = m.getTargetTime();
+        cir.setReturnValue((long) override);
+    }
 
     @Inject(method = "getRainGradient", at = @At("RETURN"), cancellable = true)
     private void onGetRainGradient(float tickDelta, CallbackInfoReturnable<Float> cir) {

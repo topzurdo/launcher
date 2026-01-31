@@ -70,8 +70,10 @@ public class OptimizationModService {
                 List<String> failed = new ArrayList<>();
 
                 // Modrinth project slugs for Fabric 1.16.5 performance mods
-                // Order: essential first, then additional optimizations
+                // Order: dependencies first (Fabric API, MixinExtras), then essential, then optional
                 String[] mods = {
+                    "fabric-api",       // Dependency: required by Dynamic FPS and others (fabric-lifecycle-events-v1)
+                    "mixinextras",      // Dependency: required by Dynamic FPS 3.x
                     "sodium",           // Essential: Modern rendering engine, huge FPS boost
                     "lithium",          // Essential: General optimization (AI, tick, etc.)
                     "starlight",        // Essential: Optimized lighting engine
@@ -83,9 +85,11 @@ public class OptimizationModService {
                     "smoothboot-fabric",// Recommended: Smoother loading
                     "cull-leaves",      // Optional: Leaf culling for FPS
                     "ebe",              // Optional: Enhanced Block Entities
-                    "hydrogen",         // Optional: More memory optimization (experimental)
+                    // hydrogen excluded: crashes on Java 17 (InaccessibleObjectException on java.base)
                 };
                 String[] names = {
+                    "Fabric API",
+                    "MixinExtras",
                     "Sodium",
                     "Lithium",
                     "Starlight",
@@ -97,7 +101,6 @@ public class OptimizationModService {
                     "Smooth Boot",
                     "Cull Leaves",
                     "Enhanced Block Entities",
-                    "Hydrogen",
                 };
 
                 for (int i = 0; i < mods.length; i++) {
@@ -221,11 +224,11 @@ public class OptimizationModService {
      */
     public List<String> getInstalledOptMods() {
         List<String> result = new ArrayList<>();
-        String[] mods = { "sodium", "lithium", "starlight", "lazydfu", "ferrite", "entityculling",
-                         "dynamic-fps", "krypton", "smoothboot", "cull-leaves", "ebe", "hydrogen" };
-        String[] names = { "Sodium", "Lithium", "Starlight", "LazyDFU", "FerriteCore",
+        String[] mods = { "fabric-api", "mixinextras", "sodium", "lithium", "starlight", "lazydfu", "ferrite", "entityculling",
+                         "dynamic-fps", "krypton", "smoothboot", "cull-leaves", "ebe" };
+        String[] names = { "Fabric API", "MixinExtras", "Sodium", "Lithium", "Starlight", "LazyDFU", "FerriteCore",
                           "Entity Culling", "Dynamic FPS", "Krypton", "Smooth Boot",
-                          "Cull Leaves", "Enhanced Block Entities", "Hydrogen" };
+                          "Cull Leaves", "Enhanced Block Entities" };
 
         for (int i = 0; i < mods.length; i++) {
             if (isModInstalled(mods[i], names[i])) {

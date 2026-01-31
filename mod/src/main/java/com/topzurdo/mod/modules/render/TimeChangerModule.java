@@ -1,11 +1,12 @@
 package com.topzurdo.mod.modules.render;
 
+import com.topzurdo.mod.TopZurdoMod;
 import com.topzurdo.mod.modules.Module;
 import com.topzurdo.mod.modules.Setting;
 
 /**
  * Visually change the time of day (client-only).
- * Uses WorldMixin to override getTimeOfDay() — no server modification.
+ * Uses WorldMixin and ClientWorldPropertiesMixin to override getTimeOfDay() — no server modification.
  * Instant change, no flicker.
  */
 public class TimeChangerModule extends Module {
@@ -37,11 +38,13 @@ public class TimeChangerModule extends Module {
     @Override
     public void onEnable() {
         super.onEnable();
-        // Apply current preset when module is enabled
         applyPreset(timePreset.getValue());
+        if (TopZurdoMod.getConfig() != null && TopZurdoMod.getConfig().isDebugLogging()) {
+            TopZurdoMod.getLogger().info("[TimeChanger] onEnable targetTime={}", currentTime);
+        }
     }
 
-    /** Called by WorldMixin to get override time. */
+    /** Called by WorldMixin/ClientWorldPropertiesMixin to get override time. */
     public int getTargetTime() {
         return currentTime;
     }
@@ -73,6 +76,9 @@ public class TimeChangerModule extends Module {
                 break;
             default:
                 currentTime = NOON;
+        }
+        if (TopZurdoMod.getConfig() != null && TopZurdoMod.getConfig().isDebugLogging()) {
+            TopZurdoMod.getLogger().info("[TimeChanger] applyPreset preset={} -> currentTime={}", preset, currentTime);
         }
     }
 }

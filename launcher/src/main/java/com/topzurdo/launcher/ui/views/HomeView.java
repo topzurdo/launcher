@@ -4,12 +4,15 @@ import com.topzurdo.launcher.config.theme.DesignTokens;
 
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
+
+import java.util.List;
 
 /**
  * Home panel: welcome, login (MS + offline), play, progress, status, stat boxes.
@@ -19,12 +22,14 @@ public class HomeView extends VBox {
     private final Label welcomeTitle;
     private final VBox microsoftLoginBox;
     private final Button microsoftLoginBtn;
-    private final TextField usernameField;
+    private final ComboBox<String> nicknameCombo;
+    private final TextField usernameField; // kept for getUsernameField() compatibility; same content as combo editor
     private final Button playButton;
     private final VBox progressSection;
     private final ProgressBar downloadProgress;
     private final Label progressPercentLabel;
     private final Label statusLabel;
+    private final Label statVersionLabel;
 
     public HomeView() {
         getStyleClass().add("panel");
@@ -57,13 +62,14 @@ public class HomeView extends VBox {
             }}
         );
 
-        usernameField = new TextField() {{
-            setPromptText("Player");
-            getStyleClass().add("username-field");
-            setPrefSize(350, 50);
-            setText("Player"); // Дефолтный ник
-            setVisible(false); // Скрываем поле
-        }};
+        nicknameCombo = new ComboBox<>();
+        nicknameCombo.setEditable(true);
+        nicknameCombo.setPromptText("Player");
+        nicknameCombo.getStyleClass().add("username-field");
+        nicknameCombo.setPrefSize(350, 50);
+        nicknameCombo.setValue("Player");
+        usernameField = new TextField();
+        usernameField.setVisible(false);
 
         VBox playSection = new VBox(DesignTokens.SPACING_24);
         playSection.setAlignment(Pos.CENTER);
@@ -84,22 +90,27 @@ public class HomeView extends VBox {
         statusLabel = new Label("Ваш приватный опыт ожидает");
         statusLabel.getStyleClass().add("status-label");
 
-        playSection.getChildren().addAll(playButton, progressSection, statusLabel);
+        playSection.getChildren().addAll(nicknameCombo, playButton, progressSection, statusLabel);
 
+        statVersionLabel = new Label("Fabric 1.16.5");
+        statVersionLabel.getStyleClass().add("stat-value");
         HBox stats = new HBox(DesignTokens.SPACING_64);
         stats.setAlignment(Pos.CENTER);
-        for (String[] t : new String[][]{
+        String[][] statRows = {
             {"СВОБОДА", "Без ограничений"},
-            {"ВЕРСИЯ", "1.16.5 Forge"},
+            {"ВЕРСИЯ", null},
             {"УТОНЧЁННОСТЬ", "Визуалы премиум"}
-        }) {
+        };
+        for (String[] t : statRows) {
             VBox b = new VBox(6);
             b.setAlignment(Pos.CENTER);
             b.getStyleClass().add("stat-box");
+            Label valueLabel = "ВЕРСИЯ".equals(t[0]) ? statVersionLabel : new Label(t[1]);
+            if (!"ВЕРСИЯ".equals(t[0])) valueLabel.getStyleClass().add("stat-value");
             b.getChildren().addAll(
                 new Label("◆") {{ getStyleClass().add("stat-icon"); }},
                 new Label(t[0]) {{ getStyleClass().add("stat-title"); }},
-                new Label(t[1]) {{ getStyleClass().add("stat-value"); }}
+                valueLabel
             );
             stats.getChildren().add(b);
         }
@@ -110,7 +121,24 @@ public class HomeView extends VBox {
     public Label getWelcomeTitle() { return welcomeTitle; }
     public VBox getMicrosoftLoginBox() { return microsoftLoginBox; }
     public Button getMicrosoftLoginBtn() { return microsoftLoginBtn; }
-    public TextField getUsernameField() { return usernameField; }
+    /** Для совместимости: возвращает поле, синхронизированное с ником (скрыто). Текущий ник — getNicknameText(). */
+    public TextField getUsernameField() {
+        String t = getNicknameText();
+        usernameField.setText(t != null ? t : "");
+        return usernameField;
+    }
+    public ComboBox<String> getNicknameCombo() { return nicknameCombo; }
+    /** Текущий введённый/выбранный ник. */
+    public String getNicknameText() {
+        String v = nicknameCombo.getEditor().getText();
+        if (v != null && !(v = v.trim()).isEmpty()) return v;
+        v = nicknameCombo.getValue();
+        return v != null && !v.isEmpty() ? v : "Player";
+    }
+    /** Устанавливает историю ников (последние 3). */
+    public void setNicknameHistory(List<String> history) {
+        if (history != null) nicknameCombo.getItems().setAll(history);
+    }
     public Button getPlayButton() { return playButton; }
     public VBox getProgressSection() { return progressSection; }
     public ProgressBar getDownloadProgress() { return downloadProgress; }
@@ -118,6 +146,15 @@ public class HomeView extends VBox {
     public Label getStatusLabel() { return statusLabel; }
 
     public void setMicrosoftLoginVisible(boolean v) { microsoftLoginBox.setVisible(v); }
-    public void setUsername(String s) { usernameField.setText(s != null ? s : ""); }
+    public void setUsername(String s) {
+        String v = s != null ? s.trim() : "";
+        if (v.isEmpty()) v = "Player";
+        nicknameCombo.setValue(v);
+        nicknameCombo.getEditor().setText(v);
+    }
     public void setUsernameEditable(boolean e) { usernameField.setDisable(!e); }
+    /** Устанавливает текст версии в блоке статистики (напр. "Fabric 1.16.5"). */
+    public void setVersionStat(String text) {
+        if (statVersionLabel != null) statVersionLabel.setText(text != null ? text : "—");
+    }
 }

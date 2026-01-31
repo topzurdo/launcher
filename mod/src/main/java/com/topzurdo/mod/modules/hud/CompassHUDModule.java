@@ -27,7 +27,7 @@ public class CompassHUDModule extends Module {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.getWindow() == null) return;
 
-        float yaw = mc.player.getYaw() % 360;
+        float yaw = mc.player.yaw % 360;
         if (yaw < 0) yaw += 360;
 
         int w = mc.getWindow().getScaledWidth();

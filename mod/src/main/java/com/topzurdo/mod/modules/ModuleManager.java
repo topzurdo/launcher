@@ -42,6 +42,7 @@ public class ModuleManager {
         register(new DamageNumbersModule());
         register(new TrailsModule());
         register(new ChinaHatModule());
+        register(new WeatherControlModule());
 
         // HUD
         register(new ArmorHUDModule());

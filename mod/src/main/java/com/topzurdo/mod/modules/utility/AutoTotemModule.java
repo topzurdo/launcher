@@ -39,7 +39,7 @@ public class AutoTotemModule extends Module {
         // Find totem in inventory
         int totemSlot = -1;
         for (int i = 0; i < 36; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.inventory.getStack(i);
             if (stack.getItem() == Items.TOTEM_OF_UNDYING) {
                 totemSlot = i;
                 break;

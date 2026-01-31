@@ -3,6 +3,8 @@ package com.topzurdo.launcher.config;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +28,7 @@ public class LauncherConfig {
 
     // User settings
     private String username = "";
+    private List<String> nicknameHistory = new ArrayList<>();
     private int allocatedRamMb = 4096;
     private String javaPath = "";
     private boolean autoConnect = true;
@@ -41,8 +44,9 @@ public class LauncherConfig {
     private String jvmProfile = "MEDIUM";
     private boolean autoRam = false;
 
-    // Visual preferences - passed to mod
+    // Visual preferences - passed to mod (serialized as hex in JSON for readability)
     private int preferredColor = 0x22D3EE; // Default cyan
+    private String preferredColorHex = "#22D3EE"; // For JSON; synced with preferredColor
     private boolean customColorEnabled = false;
 
     // JVM Arguments (default = MEDIUM profile)
@@ -68,6 +72,9 @@ public class LauncherConfig {
             try {
                 String json = Files.readString(CONFIG_FILE);
                 instance = GSON.fromJson(json, LauncherConfig.class);
+                if (instance.preferredColorHex != null && !instance.preferredColorHex.isEmpty()) {
+                    instance.setPreferredColorFromHex(instance.preferredColorHex);
+                }
                 LOGGER.info("Loaded configuration from {}", CONFIG_FILE);
             } catch (IOException e) {
                 LOGGER.error("Failed to load config, using defaults", e);
@@ -76,6 +83,7 @@ public class LauncherConfig {
         } else {
             instance = new LauncherConfig();
             instance.detectJavaPath();
+            instance.applyBestDefaults();
             instance.save();
         }
 
@@ -83,10 +91,30 @@ public class LauncherConfig {
     }
 
     /**
+     * Подбор лучших настроек под пользователя: авто RAM, профиль JVM по объёму памяти.
+     */
+    public void applyBestDefaults() {
+        int recommended = getRecommendedRam();
+        this.allocatedRamMb = recommended;
+        this.autoRam = true;
+        if (recommended >= 8192) {
+            this.jvmProfile = "HEAVY";
+        } else if (recommended >= 6144) {
+            this.jvmProfile = "MEDIUM";
+        } else {
+            this.jvmProfile = "LIGHT";
+        }
+        JvmProfile profile = JvmProfile.fromId(this.jvmProfile);
+        this.jvmArgs = profile.getJvmArgs();
+        LOGGER.info("Applied best defaults: RAM {} MB, JVM {}", allocatedRamMb, jvmProfile);
+    }
+
+    /**
      * Save configuration to file
      */
     public void save() {
         try {
+            preferredColorHex = "#" + getPreferredColorHex();
             Files.createDirectories(CONFIG_FILE.getParent());
             Files.writeString(CONFIG_FILE, GSON.toJson(this));
             LOGGER.info("Saved configuration to {}", CONFIG_FILE);
@@ -329,6 +357,16 @@ public class LauncherConfig {
         return instance != null ? instance : load();
     }
 
+    /** Minecraft game directory (e.g. .topzurdo/minecraft). */
+    public Path getMinecraftDir() {
+        return TopZurdoLauncher.MINECRAFT_DIR;
+    }
+
+    /** Max heap size in MB (for -Xmx). */
+    public int getMaxMemoryMB() {
+        return getAllocatedRamMb();
+    }
+
     // Preferred color settings
 
     public int getPreferredColor() {
@@ -359,10 +397,41 @@ public class LauncherConfig {
      */
     public void setPreferredColorFromHex(String hex) {
         try {
+            if (hex == null || hex.isEmpty()) return;
             if (hex.startsWith("#")) hex = hex.substring(1);
             this.preferredColor = Integer.parseInt(hex, 16);
+            this.preferredColorHex = "#" + getPreferredColorHex();
         } catch (NumberFormatException e) {
             LOGGER.warn("Invalid color hex: {}", hex);
+        }
+    }
+
+    public String getPreferredColorHexForJson() {
+        return preferredColorHex;
+    }
+
+    public void setPreferredColorHexForJson(String preferredColorHex) {
+        this.preferredColorHex = preferredColorHex;
+    }
+
+    /** История последних ников (до 3). */
+    public List<String> getNicknameHistory() {
+        if (nicknameHistory == null) nicknameHistory = new ArrayList<>();
+        return nicknameHistory;
+    }
+
+    public void setNicknameHistory(List<String> nicknameHistory) {
+        this.nicknameHistory = nicknameHistory != null ? nicknameHistory : new ArrayList<>();
+    }
+
+    /** Добавляет ник в историю (в начало, без дубликатов, макс. 3). */
+    public void addUsernameToHistory(String nick) {
+        if (nick == null || (nick = nick.trim()).isEmpty()) return;
+        if (nicknameHistory == null) nicknameHistory = new ArrayList<>();
+        nicknameHistory.remove(nick);
+        nicknameHistory.add(0, nick);
+        if (nicknameHistory.size() > 3) {
+            nicknameHistory = new ArrayList<>(nicknameHistory.subList(0, 3));
         }
     }
 }

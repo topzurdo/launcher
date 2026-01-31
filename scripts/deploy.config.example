@@ -1,0 +1,5 @@
+# Copy to deploy.config and set your Minecraft mods folder.
+# Example paths:
+# Windows: %APPDATA%\.minecraft\mods
+# Or launcher profile: C:\Games\TopZurdo\profiles\1.16.5-fabric\mods
+MODS_DIR=

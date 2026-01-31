@@ -38,4 +38,31 @@ public class ViewModelChangerModule extends Module {
     public float getRotationY() { return rotationY.getValue(); }
     public float getRotationZ() { return rotationZ.getValue(); }
     public float getSwingSpeed() { return swingSpeed.getValue(); }
+
+    public void applyTransform(net.minecraft.client.util.math.MatrixStack matrices, net.minecraft.util.Hand hand) {
+        if (!isEnabled()) return;
+
+        // Apply position offset
+        matrices.translate(getPosX(), getPosY(), getPosZ());
+
+        // Apply scale
+        float s = getScale();
+        matrices.scale(s, s, s);
+
+        // Apply rotations
+        if (getRotationX() != 0) {
+            matrices.multiply(net.minecraft.util.math.Vec3f.POSITIVE_X.getDegreesQuaternion(getRotationX()));
+        }
+        if (getRotationY() != 0) {
+            matrices.multiply(net.minecraft.util.math.Vec3f.POSITIVE_Y.getDegreesQuaternion(getRotationY()));
+        }
+        if (getRotationZ() != 0) {
+            matrices.multiply(net.minecraft.util.math.Vec3f.POSITIVE_Z.getDegreesQuaternion(getRotationZ()));
+        }
+    }
+
+    public float getModifiedSwingProgress(float swingProgress) {
+        if (!isEnabled()) return swingProgress;
+        return swingProgress * getSwingSpeed();
+    }
 }

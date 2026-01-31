@@ -20,6 +20,7 @@ import com.topzurdo.mod.gui.components.molecules.CategoryTab;
 import com.topzurdo.mod.gui.components.molecules.ModuleCard;
 import com.topzurdo.mod.gui.components.molecules.ScrollContainer;
 import com.topzurdo.mod.gui.components.molecules.SettingRow;
+import com.topzurdo.mod.gui.theme.DesignTokens;
 import com.topzurdo.mod.modules.Module;
 import com.topzurdo.mod.modules.ModuleManager;
 import com.topzurdo.mod.modules.Setting;
@@ -41,6 +42,10 @@ public class TopZurdoMenuScreen extends Screen {
     private int categoryPanelWidth = 118;
     private int modulePanelWidth = 205;
     private int settingsPanelWidth;
+    /** Adaptive scale factor so UI fits at any GUI Scale (1-4). Based on reference 640x420. */
+    private double uiScaleFactor = 1.0;
+    /** Scaled layout values (computed in init from uiScaleFactor). */
+    private int scaledTitleBarH, scaledContentBottomOffset, scaledCardH, scaledCardGap, scaledModulePanelPadTop;
 
     private Module.Category selectedCategory = Module.Category.RENDER;
     private Module selectedModule = null;
@@ -57,9 +62,8 @@ public class TopZurdoMenuScreen extends Screen {
     private ScrollContainer settingsScroll;
     private int totalSettingsHeight = 0;
 
-    private int footerLogX, footerLogY, footerLogW, footerLogH;
-    private int clothConfigX, clothConfigY, clothConfigW, clothConfigH;
     private final Screen parent;
+    private long handCursor = 0;
     private boolean moduleScrollbarDragging;
     private boolean settingsScrollbarDragging;
 
@@ -83,11 +87,32 @@ public class TopZurdoMenuScreen extends Screen {
         super.init();
         try {
         moduleManager = TopZurdoMod.getModuleManager();
-        guiWidth = Math.min(640, width - 40);
-        guiHeight = Math.min(420, height - OceanTheme.BOTTOM_MARGIN);
-        settingsPanelWidth = Math.max(200, guiWidth - categoryPanelWidth - modulePanelWidth - 14);
+        if (moduleManager == null) {
+            if (client != null) client.openScreen(parent);
+            return;
+        }
+        // Layout: левая 280px | центр 280px | правая 400px (референс 960×540)
+        final int refWidth = 960;
+        final int refHeight = 540;
+        uiScaleFactor = Math.min(1.0, Math.min((double) (width - 40) / refWidth, (double) (height - OceanTheme.BOTTOM_MARGIN) / refHeight));
+        uiScaleFactor = Math.max(0.6, uiScaleFactor);
+        guiWidth = (int) (refWidth * uiScaleFactor);
+        guiHeight = (int) (refHeight * uiScaleFactor);
+        categoryPanelWidth = (int) (OceanTheme.SIDEBAR_WIDTH * uiScaleFactor);
+        modulePanelWidth = (int) (OceanTheme.MODULE_PANEL_DEFAULT_WIDTH * uiScaleFactor);
+        settingsPanelWidth = Math.max((int)(OceanTheme.SETTINGS_PANEL_MIN_WIDTH * uiScaleFactor), (int)(OceanTheme.SETTINGS_PANEL_DEFAULT_WIDTH * uiScaleFactor));
+        if (categoryPanelWidth + modulePanelWidth + settingsPanelWidth + 24 > guiWidth) {
+            settingsPanelWidth = Math.max(OceanTheme.SETTINGS_PANEL_MIN_WIDTH, guiWidth - categoryPanelWidth - modulePanelWidth - 24);
+        }
         guiLeft = (width - guiWidth) / 2;
         guiTop = (height - guiHeight) / 2;
+
+        // Внутренний лейаут без уменьшения — текст и кнопки остаются читаемыми
+        scaledTitleBarH = TITLE_BAR_H;
+        scaledContentBottomOffset = OceanTheme.CONTENT_BOTTOM_OFFSET;
+        scaledCardH = CARD_H;
+        scaledCardGap = CARD_GAP;
+        scaledModulePanelPadTop = MODULE_PANEL_PAD_TOP;
 
         openAnimation = 1f;
         openAnimationPrev = 1f;
@@ -96,36 +121,45 @@ public class TopZurdoMenuScreen extends Screen {
 
         restoreUIState();
 
-        createModuleCards();
-        int modContentTop = guiTop + TITLE_BAR_H + MODULE_PANEL_PAD_TOP;
-        int contentBottom = guiTop + guiHeight - OceanTheme.CONTENT_BOTTOM_OFFSET;
+        int modContentWidth = modulePanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER;
+        int setContentWidth = settingsPanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER;
+
+        createModuleCards(modContentWidth);
+        int modContentTop = guiTop + scaledTitleBarH + scaledModulePanelPadTop;
+        int contentBottom = guiTop + guiHeight - scaledContentBottomOffset;
         int modVisibleH = contentBottom - modContentTop;
-        int modTotalH = moduleManager.getModulesByCategory(selectedCategory).size() * (CARD_H + CARD_GAP);
+        int modTotalH = moduleManager.getModulesByCategory(selectedCategory).size() * (scaledCardH + scaledCardGap);
         int modPanelX = guiLeft + categoryPanelWidth + 6;
         moduleScroll = new ScrollContainer(modPanelX, modContentTop, modulePanelWidth - 12, modVisibleH, modTotalH);
+        moduleScroll.setContentZoneWidth(modContentWidth);
 
-        int setContentTop = guiTop + TITLE_BAR_H + OceanTheme.SETTINGS_HEADER_H;
+        int setContentTop = guiTop + scaledTitleBarH + OceanTheme.SETTINGS_HEADER_H;
         int setVisibleH = contentBottom - setContentTop;
         settingsScroll = new ScrollContainer(guiLeft + categoryPanelWidth + modulePanelWidth + 6, setContentTop, settingsPanelWidth - 12, setVisibleH, 0);
+        settingsScroll.setContentZoneWidth(setContentWidth);
 
         selectRestoredModule();
         restoreScrollOffsets();
+
+        handCursor = GLFW.glfwCreateStandardCursor(GLFW.GLFW_HAND_CURSOR);
         } catch (Throwable t) {
             if (TopZurdoMod.getInstance() != null) TopZurdoMod.getLogger().error("[TopZurdo] TopZurdoMenuScreen.init", t);
             throw t;
         }
     }
 
-    private void createModuleCards() {
+    private void createModuleCards(int moduleContentWidth) {
         moduleCards.clear();
+        int cardW = Math.max(100, moduleContentWidth - 16);
         for (Module m : moduleManager.getAllModules()) {
-            String title = GuiUtil.resolveKey(m.getName());
-            String desc = GuiUtil.resolveKey(m.getDescription());
-            int cardW = modulePanelWidth - 24 - OceanTheme.SCROLLBAR_WIDTH - 8;
-            ModuleCard card =
-                new ModuleCard(0, 0, cardW, CARD_H, title, desc, m.isEnabled(), m == selectedModule);
+            ModuleCard card = new ModuleCard(0, 0, cardW, scaledCardH, m, this::onModuleSelected);
             moduleCards.put(m, card);
         }
+    }
+
+    private void onModuleSelected(Module mod) {
+        selectedModule = mod;
+        updateSettingsComponents();
     }
 
     private void restoreUIState() {
@@ -192,57 +226,23 @@ public class TopZurdoMenuScreen extends Screen {
             return;
         }
 
-        int w = settingsPanelWidth - OceanTheme.SETTINGS_PAD_X * 2 - OceanTheme.SCROLLBAR_WIDTH - 28;
-        int y = 0;
+        int settingsContentWidth = settingsPanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER;
+        int w = Math.max(OceanTheme.SETTINGS_ROW_MIN_WIDTH, settingsContentWidth - OceanTheme.SETTINGS_PAD_X * 2 - 12);
+        String moduleId = selectedModule.getId();
         for (Setting<?> s : selectedModule.getSettings()) {
-            String name = GuiUtil.resolveKey(s.getName());
-            UIComponent control = null;
-            if (s.isBoolean()) {
-                Toggle t = new Toggle(0, 0, w, OceanTheme.ROW_TOGGLE_H, name, (Boolean) s.getValue(),
-                    v -> { ((Setting<Boolean>) s).setValue(v); s.save(selectedModule.getId()); });
-                control = t;
-            } else if (s.isColor()) {
-                // Color picker for color settings
-                int colorVal = (Integer) s.getValue();
-                ColorPicker cp = new ColorPicker(0, 0, w, OceanTheme.ROW_TOGGLE_H, name, colorVal,
-                    v -> { ((Setting<Integer>) s).setValue(v); s.save(selectedModule.getId()); });
-                control = cp;
-            } else if (s.isNumber()) {
-                double min = s.getMin() != null ? s.getMin().doubleValue() : 0;
-                double max = s.getMax() != null ? s.getMax().doubleValue() : 100;
-                double val = ((Number) s.getValue()).doubleValue();
-                double step = s.isInteger() ? 1 : 0.1;
-                Slider sl = new Slider(0, 0, w, OceanTheme.ROW_SLIDER_H, name, min, max, val, step, !s.isInteger(),
-                    v -> {
-                        if (s.isInteger()) ((Setting<Integer>) s).setValue((int) Math.round(v));
-                        else if (s.isFloat()) ((Setting<Float>) s).setValue(v.floatValue());
-                        else ((Setting<Double>) s).setValue(v);
-                        s.save(selectedModule.getId());
-                    });
-                control = sl;
-            } else if (s.isOptions()) {
-                Object v = s.getValue();
-                String opt = (v instanceof String && s.getOptions().contains(v)) ? (String) v
-                    : (s.getOptions().isEmpty() ? "" : s.getOptions().get(0));
-                Selector sel = new Selector(0, 0, w, OceanTheme.ROW_SELECTOR_H, name, s.getOptions(), opt,
-                    v2 -> { ((Setting<String>) s).setValue(v2); s.save(selectedModule.getId()); });
-                control = sel;
-            } else if (s.isString()) {
-                String val = (String) s.getValue();
-                if (val == null) val = "";
-                TextInput ti = new TextInput(0, 0, w, OceanTheme.ROW_SLIDER_H + 14, name, val, 64,
-                    v -> { ((Setting<String>) s).setValue(v); s.save(selectedModule.getId());
-                        if (selectedModule instanceof com.topzurdo.mod.modules.utility.ContainerSearcherModule) {
-                            ((com.topzurdo.mod.modules.utility.ContainerSearcherModule) selectedModule).setSearchQuery(v);
-                        }
-                    });
-                control = ti;
-            }
-            if (control != null) {
-                SettingRow row = new SettingRow(0, 0, w, control);
-                settingRows.add(row);
-                settingsList.add(s);
-            }
+            if (s == null) continue;
+            Runnable onChanged = () -> {
+                if (selectedModule != null) {
+                    s.save(moduleId);
+                    if (selectedModule instanceof com.topzurdo.mod.modules.utility.ContainerSearcherModule && s.isString()) {
+                        String v = (String) s.getValue();
+                        ((com.topzurdo.mod.modules.utility.ContainerSearcherModule) selectedModule).setSearchQuery(v != null ? v : "");
+                    }
+                }
+            };
+            SettingRow row = new SettingRow(0, 0, w, s, onChanged);
+            settingRows.add(row);
+            settingsList.add(s);
         }
         totalSettingsHeight = 0;
         for (SettingRow r : settingRows) totalSettingsHeight += r.getHeight();
@@ -268,10 +268,7 @@ public class TopZurdoMenuScreen extends Screen {
             e.getValue().setSelected(e.getKey() == selectedModule);
             e.getValue().tick();
         }
-        for (SettingRow row : settingRows) {
-            UIComponent c = row.getControl();
-            if (c instanceof Toggle) ((Toggle) c).tick();
-        }
+        for (SettingRow row : settingRows) row.tick();
     }
 
     @Override
@@ -283,23 +280,20 @@ public class TopZurdoMenuScreen extends Screen {
         float eased = getEasedOpen(rawOpen);
         float rawCat = categoryAnimationPrev + (categoryAnimation - categoryAnimationPrev) * partialTicks;
 
-        // Background with gradient
-        UIRenderHelper.fillVerticalGradient(ms, 0, 0, width, height, 0xFF0A0A18, OceanTheme.BG_DEEP);
+        // Фон: градиент #0a0e1a → #1a1f2e (геймерская тема)
+        UIRenderHelper.fillVerticalGradient(ms, 0, 0, width, height, OceanTheme.BG_GRADIENT_TOP, OceanTheme.BG_GRADIENT_BOTTOM);
 
-        // Subtle grid
-        int gridColor = UIRenderHelper.withAlpha(OceanTheme.NEON_PURPLE, 0.02f);
-        for (int gx = 0; gx < width; gx += 32) {
+        // Лёгкая сетка для глубины
+        int gridColor = UIRenderHelper.withAlpha(OceanTheme.ACCENT_SECONDARY, 0.03f);
+        for (int gx = 0; gx < width; gx += 40) {
             UIRenderHelper.fill(ms, gx, 0, gx + 1, height, gridColor);
         }
-        for (int gy = 0; gy < height; gy += 32) {
+        for (int gy = 0; gy < height; gy += 40) {
             UIRenderHelper.fill(ms, 0, gy, width, gy + 1, gridColor);
         }
 
-        // Scanlines
-        UIRenderHelper.drawScanlines(ms, 0, 0, width, height, 3, 0.025f);
-
-        // Overlay
-        int overlayAlpha = (int) ((OceanTheme.BG_OVERLAY >>> 24) * eased);
+        // Overlay затемнения при открытии
+        int overlayAlpha = (int) ((OceanTheme.BG_OVERLAY >>> 24) * (1f - eased * 0.3f));
         UIRenderHelper.fill(ms, 0, 0, width, height, (Math.min(255, overlayAlpha) << 24) | (OceanTheme.BG_OVERLAY & 0x00FFFFFF));
 
         ms.push();
@@ -309,17 +303,26 @@ public class TopZurdoMenuScreen extends Screen {
         drawOceanPanel(ms, guiLeft, guiTop, guiWidth, guiHeight, categoryPanelWidth);
         drawPanelShadow(ms, guiLeft, guiTop, guiWidth, guiHeight, 1f);
         renderTitleBar(ms);
-        renderCategoryPanel(ms, lmx, lmy);
+        renderCategoryPanel(ms, lmx, lmy, partialTicks);
 
-        int contentBottom = guiTop + guiHeight - OceanTheme.CONTENT_BOTTOM_OFFSET;
-        drawVerticalLine(ms, guiLeft + categoryPanelWidth, guiTop + (TITLE_BAR_H - 2), guiHeight - 54);
+        int contentBottom = guiTop + guiHeight - scaledContentBottomOffset;
+        int sepH = Math.max(0, contentBottom - (guiTop + scaledTitleBarH));
+        drawVerticalLine(ms, guiLeft + categoryPanelWidth, guiTop + scaledTitleBarH, sepH);
         renderModulePanel(ms, lmx, lmy, contentBottom, eased, rawCat, partialTicks);
-        drawVerticalLine(ms, guiLeft + categoryPanelWidth + modulePanelWidth, guiTop + (TITLE_BAR_H - 2), guiHeight - 54);
+        drawVerticalLine(ms, guiLeft + categoryPanelWidth + modulePanelWidth, guiTop + scaledTitleBarH, sepH);
 
         renderSettingsPanel(ms, lmx, lmy, contentBottom, eased, partialTicks);
-        renderFooter(ms);
+        renderFooter(ms, lmx, lmy);
 
         ms.pop();
+
+        // Cursor pointer for interactive components
+        if (handCursor != 0 && client != null && client.getWindow() != null) {
+            long win = client.getWindow().getHandle();
+            boolean overInteractive = isOverInteractiveComponent(lmx, lmy);
+            GLFW.glfwSetCursor(win, overInteractive ? handCursor : 0);
+        }
+
         super.render(ms, mouseX, mouseY, partialTicks);
         } catch (Throwable t) {
             if (TopZurdoMod.getInstance() != null) TopZurdoMod.getLogger().error("[TopZurdo] TopZurdoMenuScreen.render", t);
@@ -330,17 +333,18 @@ public class TopZurdoMenuScreen extends Screen {
     private void renderTitleBar(MatrixStack ms) {
         String title = "TOPZURDO";
         int tw = textRenderer.getWidth(title);
-        float scale = 1.5f;
+        float scale = 1.35f;
         int cx = guiLeft + guiWidth / 2;
-        int ty = guiTop + 12;
+        int ty = guiTop + 14;
 
         ms.push();
         ms.translate(cx, ty, 0);
         ms.scale(scale, scale, 1f);
 
-        int glowColor = UIRenderHelper.withAlpha(OceanTheme.NEON_GOLD, 0.2f);
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dy = -2; dy <= 2; dy++) {
+        // Лёгкое свечение заголовка (primary accent)
+        int glowColor = UIRenderHelper.withAlpha(OceanTheme.ACCENT, 0.25f);
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
                 if (dx != 0 || dy != 0) {
                     textRenderer.draw(ms, title, -tw / 2f + dx, dy, glowColor);
                 }
@@ -351,36 +355,32 @@ public class TopZurdoMenuScreen extends Screen {
         for (int i = 0; i < title.length(); i++) {
             char c = title.charAt(i);
             float t = (float) i / Math.max(1, title.length() - 1);
-            int color = UIRenderHelper.lerpColor(OceanTheme.NEON_GOLD, OceanTheme.NEON_CYAN, t);
+            int color = UIRenderHelper.lerpColor(OceanTheme.ACCENT, OceanTheme.ACCENT_SECONDARY, t);
             textRenderer.draw(ms, String.valueOf(c), x, 0, color);
             x += textRenderer.getWidth(String.valueOf(c));
         }
         ms.pop();
 
-        // Decorative accents
         int leftEdge = (int) (cx - tw * scale / 2);
-        UIRenderHelper.fill(ms, leftEdge - 12, ty + 4, leftEdge - 4, ty + 6, OceanTheme.NEON_GOLD);
-        UIRenderHelper.fill(ms, cx + (int)(tw * scale / 2) + 4, ty + 4, cx + (int)(tw * scale / 2) + 12, ty + 6, OceanTheme.NEON_GOLD);
+        UIRenderHelper.fill(ms, leftEdge - 10, ty + 5, leftEdge - 4, ty + 7, OceanTheme.ACCENT);
+        UIRenderHelper.fill(ms, cx + (int)(tw * scale / 2) + 4, ty + 5, cx + (int)(tw * scale / 2) + 10, ty + 7, OceanTheme.ACCENT_SECONDARY);
 
         String sub = I18n.translate("topzurdo.gui.subtitle");
-        textRenderer.drawWithShadow(ms, sub, guiLeft + (guiWidth - textRenderer.getWidth(sub)) / 2f, guiTop + 28, OceanTheme.TEXT_DIM);
+        textRenderer.drawWithShadow(ms, sub, guiLeft + (guiWidth - textRenderer.getWidth(sub)) / 2f, guiTop + 30, OceanTheme.TEXT_SECONDARY);
 
-        UIRenderHelper.fill(ms, guiLeft + 24, guiTop + 42, guiLeft + guiWidth - 24, guiTop + 43, UIRenderHelper.withAlpha(OceanTheme.NEON_PURPLE, 0.4f));
+        UIRenderHelper.fill(ms, guiLeft + 24, guiTop + 44, guiLeft + guiWidth - 24, guiTop + 45, OceanTheme.BORDER);
     }
 
-    private void renderCategoryPanel(MatrixStack ms, int lmx, int lmy) {
+    private void renderCategoryPanel(MatrixStack ms, int lmx, int lmy, float partialTicks) {
         int x = guiLeft + OceanTheme.SPACE_8;
-        int y = guiTop + TITLE_BAR_H;
+        int y = guiTop + scaledTitleBarH;
         int catBtnW = categoryPanelWidth - OceanTheme.SPACE_12;
         int catBtnH = 36;
         int catStep = 40;
         for (Module.Category cat : Module.Category.values()) {
-            String label = elegantCategoryName(cat);
-            int cnt = moduleManager.getModulesByCategory(cat).size();
-            int on = (int) moduleManager.getModulesByCategory(cat).stream().filter(Module::isEnabled).count();
-            String icon = iconForCategory(cat);
-            CategoryTab tab = new CategoryTab(x, y, catBtnW, catBtnH, label, icon, on, cnt, cat == selectedCategory);
-            tab.render(ms, lmx, lmy);
+            CategoryTab tab = new CategoryTab(x, y, catBtnW, catBtnH, cat, c -> { selectedCategory = c; });
+            tab.setSelected(cat == selectedCategory);
+            tab.render(ms, lmx, lmy, partialTicks);
             y += catStep;
         }
     }
@@ -403,16 +403,17 @@ public class TopZurdoMenuScreen extends Screen {
     private void renderModulePanel(MatrixStack ms, int lmx, int lmy, int contentBottom, float eased, float rawCat, float partialTicks) {
         List<Module> modules = moduleManager.getModulesByCategory(selectedCategory);
         int panelX = guiLeft + categoryPanelWidth + 6;
-        int panelY = guiTop + TITLE_BAR_H;
-        int modContentTop = panelY + MODULE_PANEL_PAD_TOP;
+        int panelY = guiTop + scaledTitleBarH;
+        int modContentTop = panelY + scaledModulePanelPadTop;
         int modVisibleH = contentBottom - modContentTop;
 
         if (moduleScroll != null) {
-            moduleScroll.setContentHeight(modules.size() * (CARD_H + CARD_GAP));
+            moduleScroll.setContentHeight(modules.size() * (scaledCardH + scaledCardGap));
         }
 
+        int modContentWidth = modulePanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER;
         textRenderer.drawWithShadow(ms, I18n.translate("topzurdo.gui.modules"), panelX + 8, panelY, OceanTheme.ACCENT_SECONDARY);
-        applyScissor(panelX, modContentTop, modulePanelWidth - 12, modVisibleH);
+        applyScissor(panelX, modContentTop, modContentWidth, modVisibleH);
         ms.push();
         int off = moduleScroll != null ? moduleScroll.getScrollOffset() : 0;
         int y = modContentTop - off;
@@ -424,94 +425,133 @@ public class TopZurdoMenuScreen extends Screen {
                 card.setAlphaMultiplier(rawCat);
                 card.setPartialTicks(partialTicks);
                 card.setPosition(panelX + 4, y);
-                if (y + CARD_H >= panelY + 12 && y < contentBottom - 2)
-                    card.render(ms, lmx, lmy);
+                if (y + scaledCardH >= panelY + 12 && y < contentBottom - 2)
+                    card.render(ms, lmx, lmy, partialTicks);
             }
-            y += CARD_H + CARD_GAP;
+            y += scaledCardH + scaledCardGap;
         }
         ms.pop();
-        if (moduleScroll != null && moduleScroll.getMaxScroll() > 0)
-            moduleScroll.renderScrollbar(ms);
         RenderSystem.disableScissor();
+        if (moduleScroll != null && moduleScroll.getMaxScroll() > 0)
+            moduleScroll.renderScrollbar(ms, lmx, lmy);
     }
 
     private void renderSettingsPanel(MatrixStack ms, int lmx, int lmy, int contentBottom, float eased, float partialTicks) {
         int panelX = guiLeft + categoryPanelWidth + modulePanelWidth + 6;
         int panelW = settingsPanelWidth;
-        int baseY = guiTop + TITLE_BAR_H;
+        int baseY = guiTop + scaledTitleBarH;
         int setContentTop = baseY + OceanTheme.SETTINGS_HEADER_H;
         int setContentBottom = contentBottom;
         int visibleH = setContentBottom - setContentTop;
 
         settingsScroll.setContentHeight(totalSettingsHeight);
 
+        int headerContentW = settingsPanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER - 24;
         if (selectedModule == null) {
-            DrawableHelper.drawCenteredText(ms, textRenderer, I18n.translate("topzurdo.gui.select_module"), panelX + panelW / 2, baseY + 60, OceanTheme.TEXT_DIM);
+            DrawableHelper.drawCenteredText(ms, textRenderer, I18n.translate("topzurdo.gui.select_module"), panelX + headerContentW / 2, baseY + 60, DesignTokens.fgSecondary());
             return;
         }
-
         String name = GuiUtil.resolveKey(selectedModule.getName());
-        String nameUp = GuiUtil.truncate(textRenderer, name.toUpperCase(), panelW - 24);
-        textRenderer.drawWithShadow(ms, nameUp, panelX + (panelW - textRenderer.getWidth(nameUp)) / 2f, baseY, OceanTheme.ACCENT);
+        String nameUp = GuiUtil.truncate(textRenderer, name.toUpperCase(), Math.min(panelW - 24, headerContentW));
+        textRenderer.drawWithShadow(ms, nameUp, panelX + (headerContentW - textRenderer.getWidth(nameUp)) / 2f, baseY, OceanTheme.ACCENT);
         String status = selectedModule.isEnabled() ? I18n.translate("topzurdo.module.enabled") : I18n.translate("topzurdo.module.disabled");
-        textRenderer.drawWithShadow(ms, status, panelX + (panelW - textRenderer.getWidth(status)) / 2f, baseY + 10, selectedModule.isEnabled() ? OceanTheme.SUCCESS : OceanTheme.TEXT_DIM);
-        drawHorizontalLine(ms, panelX + 16, baseY + 22, panelW - 32);
+        textRenderer.drawWithShadow(ms, status, panelX + (headerContentW - textRenderer.getWidth(status)) / 2f, baseY + 10, selectedModule.isEnabled() ? OceanTheme.SUCCESS : DesignTokens.fgSecondary());
+        drawHorizontalLine(ms, panelX + OceanTheme.SPACE_16, baseY + 22, headerContentW - OceanTheme.SPACE_16);
         String desc = GuiUtil.resolveKey(selectedModule.getDescription());
-        DrawableHelper.drawCenteredText(ms, textRenderer, GuiUtil.truncate(textRenderer, desc, panelW - 24), panelX + panelW / 2, baseY + 34, OceanTheme.TEXT_DIM);
+        DrawableHelper.drawCenteredText(ms, textRenderer, GuiUtil.truncate(textRenderer, desc, headerContentW), panelX + headerContentW / 2, baseY + 34, DesignTokens.fgSecondary());
 
         if (settingRows.isEmpty()) {
-            DrawableHelper.drawCenteredText(ms, textRenderer, I18n.translate("topzurdo.gui.no_settings"), panelX + panelW / 2, baseY + 90, OceanTheme.TEXT_MUTED);
+            DrawableHelper.drawCenteredText(ms, textRenderer, I18n.translate("topzurdo.gui.no_settings"), panelX + headerContentW / 2, baseY + 90, DesignTokens.fgMuted());
         } else {
             int off = settingsScroll.getScrollOffset();
             int adjMy = lmy + off;
-            int settingsX = guiLeft + categoryPanelWidth + modulePanelWidth + OceanTheme.SETTINGS_PAD_X;
+            int settingsContentWidth = settingsPanelWidth - 12 - OceanTheme.SCROLLBAR_GUTTER;
+            int settingsX = panelX + OceanTheme.SETTINGS_PAD_X;
             int rowY = setContentTop;
             String hoveredDesc = null;
-            applyScissor(panelX, setContentTop, settingsPanelWidth - 12, visibleH);
+            applyScissor(panelX, setContentTop, settingsContentWidth, visibleH);
             ms.push();
             ms.translate(0, -off, 0);
-            int idx = 0;
             for (SettingRow row : settingRows) {
-                UIComponent c = row.getControl();
-                c.setPartialTicks(partialTicks);
                 row.setPosition(settingsX, rowY);
-                if (idx < settingsList.size()) {
-                    Setting<?> s = settingsList.get(idx);
-                    if (c instanceof Slider && s.isNumber())
-                        ((Slider) c).setValue(((Number) s.getValue()).doubleValue());
-                    else if (c instanceof Toggle && s.isBoolean())
-                        ((Toggle) c).setValue((Boolean) s.getValue());
-                    else if (c instanceof ColorPicker && s.isColor())
-                        ((ColorPicker) c).setValue((Integer) s.getValue());
-                    else if (c instanceof TextInput && s.isString()) {
-                        Object v = s.getValue();
-                        ((TextInput) c).setText(v != null ? v.toString() : "");
-                    } else if (c instanceof Selector && s.isOptions()) {
-                        Object v = s.getValue();
-                        String o = (v instanceof String && s.getOptions().contains(v)) ? (String) v : (s.getOptions().isEmpty() ? "" : s.getOptions().get(0));
-                        ((Selector) c).setValue(o);
-                    }
-                }
                 row.render(ms, lmx, adjMy);
-                if (idx < settingsList.size() && isSettingRowHovered(row, lmx, adjMy))
-                    hoveredDesc = GuiUtil.resolveKey(settingsList.get(idx).getDescription());
+                if (isSettingRowHovered(row, lmx, adjMy)) {
+                    Setting<?> st = row.getSetting();
+                    if (st != null) hoveredDesc = GuiUtil.resolveKey(st.getDescription());
+                }
                 rowY += row.getHeight();
-                idx++;
             }
             ms.pop();
             if (settingsScroll.getMaxScroll() > 0)
-                settingsScroll.renderScrollbar(ms);
+                settingsScroll.renderScrollbar(ms, lmx, lmy);
             RenderSystem.disableScissor();
+            rowY = setContentTop;
+            ms.push();
+            ms.translate(0, -off, 0);
+            for (SettingRow row : settingRows) {
+                row.setPosition(settingsX, rowY);
+                UIComponent c = row.getControl();
+                if (c instanceof ColorPicker && ((ColorPicker) c).isExpanded()) {
+                    ((ColorPicker) c).renderExpandedPart(ms, lmx, adjMy);
+                }
+                if (c instanceof Selector && ((Selector) c).isExpanded()) {
+                    ((Selector) c).renderExpandedPart(ms, lmx, adjMy, setContentBottom, off);
+                }
+                rowY += row.getHeight();
+            }
+            ms.pop();
             if (hoveredDesc != null) {
-                hoveredDesc = GuiUtil.truncate(textRenderer, hoveredDesc, panelW - 24);
-                int hoverY = guiTop + guiHeight - OceanTheme.FOOTER_H - OceanTheme.HOVER_DESC_H - 2;
-                textRenderer.drawWithShadow(ms, hoveredDesc, panelX + 8, hoverY, OceanTheme.TEXT_MUTED);
+                hoveredDesc = GuiUtil.truncate(textRenderer, hoveredDesc, headerContentW);
+                int hoverY = guiTop + guiHeight - scaledContentBottomOffset + 4;
+                textRenderer.drawWithShadow(ms, hoveredDesc, panelX + OceanTheme.SPACE_8, hoverY, DesignTokens.fgMuted());
             }
         }
     }
 
+    private boolean isOverInteractiveComponent(int mx, int my) {
+        int localMy = my;
+        int off = settingsScroll != null ? settingsScroll.getScrollOffset() : 0;
+        int adjMy = localMy + off;
+
+        // Categories
+        int catY = guiTop + scaledTitleBarH, catBtnH = 36, catStep = 40;
+        int catLeft = guiLeft + OceanTheme.SPACE_8, catBtnW = categoryPanelWidth - OceanTheme.SPACE_12;
+        for (Module.Category cat : Module.Category.values()) {
+            if (mx >= catLeft && mx < catLeft + catBtnW && my >= catY && my < catY + catBtnH) return true;
+            catY += catStep;
+        }
+
+        // Module cards
+        List<Module> modules = moduleManager != null ? moduleManager.getModulesByCategory(selectedCategory) : java.util.Collections.emptyList();
+        int modPanelX = guiLeft + categoryPanelWidth + 6;
+        int modOff = moduleScroll != null ? moduleScroll.getScrollOffset() : 0;
+        int modContentTop = guiTop + scaledTitleBarH + scaledModulePanelPadTop;
+        int y = modContentTop - modOff;
+        for (Module m : modules) {
+            ModuleCard card = moduleCards.get(m);
+            if (card != null && mx >= modPanelX + 4 && mx < modPanelX + 4 + (modulePanelWidth - 16) && my >= y && my < y + scaledCardH)
+                return true;
+            y += scaledCardH + scaledCardGap;
+        }
+
+        // Setting rows
+        for (SettingRow row : settingRows) {
+            UIComponent c = row.getControl();
+            if (c != null && (c instanceof Toggle && ((Toggle) c).isMouseOver(mx, adjMy)
+                || c instanceof Slider && ((Slider) c).isMouseOver(mx, adjMy)
+                || c instanceof Selector && ((Selector) c).isMouseOver(mx, adjMy)
+                || c instanceof ColorPicker && ((ColorPicker) c).isMouseOver(mx, adjMy)
+                || c instanceof TextInput && ((TextInput) c).isMouseOver(mx, adjMy)))
+                return true;
+        }
+
+        // Footer buttons
+        return false;
+    }
+
     private boolean isSettingRowHovered(SettingRow row, int mx, int my) {
         UIComponent c = row.getControl();
+        if (c == null) return false;
         if (c instanceof Toggle) return ((Toggle) c).isMouseOver(mx, my);
         if (c instanceof Slider) return ((Slider) c).isMouseOver(mx, my);
         if (c instanceof Selector) return ((Selector) c).isMouseOver(mx, my);
@@ -520,39 +560,14 @@ public class TopZurdoMenuScreen extends Screen {
         return false;
     }
 
-    private void renderFooter(MatrixStack ms) {
-        boolean logOn = TopZurdoMod.getConfig() != null && TopZurdoMod.getConfig().isDebugLogging();
-        String logLabel = logOn ? I18n.translate("topzurdo.gui.debug_logging.on") : I18n.translate("topzurdo.gui.debug_logging.off");
-        String clothLabel = I18n.translate("topzurdo.gui.cloth_config");
-        footerLogW = textRenderer.getWidth(logLabel) + 14;
-        footerLogH = 18;
-        clothConfigW = textRenderer.getWidth(clothLabel) + 14;
-        clothConfigH = 18;
-        clothConfigX = guiLeft + guiWidth - footerLogW - clothConfigW - 28;
-        clothConfigY = guiTop + guiHeight - 28;
-        footerLogX = guiLeft + guiWidth - footerLogW - 20;
-        footerLogY = guiTop + guiHeight - 28;
-
-        UIRenderHelper.fill(ms, clothConfigX, clothConfigY, clothConfigX + clothConfigW, clothConfigY + clothConfigH, OceanTheme.BG_INNER);
-        UIRenderHelper.fill(ms, clothConfigX, clothConfigY, clothConfigX + clothConfigW, clothConfigY + OceanTheme.BORDER_WIDTH, OceanTheme.BORDER_SUBTLE);
-        UIRenderHelper.fill(ms, clothConfigX, clothConfigY + clothConfigH - OceanTheme.BORDER_WIDTH, clothConfigX + clothConfigW, clothConfigY + clothConfigH, OceanTheme.BORDER_SUBTLE);
-        UIRenderHelper.fill(ms, clothConfigX, clothConfigY, clothConfigX + OceanTheme.BORDER_WIDTH, clothConfigY + clothConfigH, OceanTheme.BORDER_SUBTLE);
-        UIRenderHelper.fill(ms, clothConfigX + clothConfigW - OceanTheme.BORDER_WIDTH, clothConfigY, clothConfigX + clothConfigW, clothConfigY + clothConfigH, OceanTheme.BORDER_SUBTLE);
-        textRenderer.drawWithShadow(ms, clothLabel, clothConfigX + 7, clothConfigY + 5, OceanTheme.TEXT_MUTED);
-
-        int hintMaxW = guiWidth - footerLogW - clothConfigW - 36;
+    private void renderFooter(MatrixStack ms, int mouseX, int mouseY) {
+        int footerRowTop = guiTop + guiHeight - OceanTheme.FOOTER_H;
+        int hintMaxW = guiWidth - OceanTheme.SPACE_32;
         List<String> lines = GuiUtil.wrapHint(textRenderer, I18n.translate("topzurdo.gui.footer"), hintMaxW);
-        int fy = lines.size() > 1 ? guiTop + guiHeight - 34 : guiTop + guiHeight - 28;
+        int hoverZoneTop = guiTop + guiHeight - scaledContentBottomOffset;
+        int fy = lines.size() > 1 ? hoverZoneTop + 6 : footerRowTop + (OceanTheme.FOOTER_H - 9) / 2;
         for (int i = 0; i < lines.size(); i++)
-            textRenderer.drawWithShadow(ms, lines.get(i), guiLeft + 10, fy + i * 10, OceanTheme.TEXT_MUTED);
-
-        UIRenderHelper.fill(ms, footerLogX, footerLogY, footerLogX + footerLogW, footerLogY + footerLogH, OceanTheme.BG_INNER);
-        int brd = logOn ? (OceanTheme.SUCCESS & 0xCCFFFFFF) : OceanTheme.BORDER_SUBTLE;
-        UIRenderHelper.fill(ms, footerLogX, footerLogY, footerLogX + footerLogW, footerLogY + OceanTheme.BORDER_WIDTH, brd);
-        UIRenderHelper.fill(ms, footerLogX, footerLogY + footerLogH - OceanTheme.BORDER_WIDTH, footerLogX + footerLogW, footerLogY + footerLogH, brd);
-        UIRenderHelper.fill(ms, footerLogX, footerLogY, footerLogX + OceanTheme.BORDER_WIDTH, footerLogY + footerLogH, brd);
-        UIRenderHelper.fill(ms, footerLogX + footerLogW - OceanTheme.BORDER_WIDTH, footerLogY, footerLogX + footerLogW, footerLogY + footerLogH, brd);
-        textRenderer.drawWithShadow(ms, logLabel, footerLogX + 7, footerLogY + 5, logOn ? OceanTheme.SUCCESS : OceanTheme.TEXT_MUTED);
+            textRenderer.drawWithShadow(ms, lines.get(i), guiLeft + OceanTheme.SPACE_12, fy + i * 10, DesignTokens.fgMuted());
     }
 
     private void drawOceanPanel(MatrixStack ms, int x, int y, int w, int h, int catW) {
@@ -646,7 +661,7 @@ public class TopZurdoMenuScreen extends Screen {
             }
         }
 
-        int catY = guiTop + TITLE_BAR_H, catBtnH = 36, catStep = 40;
+        int catY = guiTop + scaledTitleBarH, catBtnH = 36, catStep = 40;
         int catLeft = guiLeft + OceanTheme.SPACE_8, catBtnW = categoryPanelWidth - OceanTheme.SPACE_12;
         for (Module.Category cat : Module.Category.values()) {
             if (mx >= catLeft && mx < catLeft + catBtnW && localMy >= catY && localMy < catY + catBtnH) {
@@ -688,16 +703,30 @@ public class TopZurdoMenuScreen extends Screen {
             return true;
         }
 
-        for (SettingRow row : settingRows) {
+        // Expanded overlays first (reverse order so topmost wins): ColorPicker palette, Selector dropdown list only
+        int setContentBottom = guiTop + guiHeight - scaledContentBottomOffset;
+        for (int i = settingRows.size() - 1; i >= 0; i--) {
+            SettingRow row = settingRows.get(i);
+            UIComponent c = row.getControl();
+            if (c instanceof ColorPicker && ((ColorPicker) c).isExpanded() && ((ColorPicker) c).isMouseOver(mx, adjMy)) {
+                if (((ColorPicker) c).mouseClicked(lx, adjMy, button)) return true;
+            }
+            if (c instanceof Selector && ((Selector) c).isMouseOverDropdown(mx, adjMy, setContentBottom, off)) {
+                if (((Selector) c).mouseClicked(lx, adjMy, button)) return true;
+            }
+        }
+
+        for (int i = 0; i < settingRows.size(); i++) {
+            SettingRow row = settingRows.get(i);
             UIComponent c = row.getControl();
             if (c instanceof Toggle) {
-                if (((Toggle) c).isMouseOver(mx, adjMy)) { ((Toggle) c).onMouseClick(); return true; }
+                if (((Toggle) c).isMouseOver(mx, adjMy)) { focusedSettingIndex = i; ((Toggle) c).onMouseClick(); return true; }
             } else if (c instanceof Slider) {
-                if (((Slider) c).mouseClicked(lx, adjMy, button)) return true;
+                if (((Slider) c).mouseClicked(lx, adjMy, button)) { focusedSettingIndex = i; return true; }
             } else if (c instanceof ColorPicker) {
-                if (((ColorPicker) c).mouseClicked(lx, adjMy, button)) return true;
+                if (((ColorPicker) c).mouseClicked(lx, adjMy, button)) { focusedSettingIndex = i; return true; }
             } else if (c instanceof Selector) {
-                if (((Selector) c).mouseClicked(lx, adjMy, button)) return true;
+                if (((Selector) c).mouseClicked(lx, adjMy, button)) { focusedSettingIndex = i; return true; }
             } else if (c instanceof TextInput) {
                 if (((TextInput) c).isMouseOver(mx, adjMy)) {
                     for (SettingRow r : settingRows) {
@@ -705,6 +734,7 @@ public class TopZurdoMenuScreen extends Screen {
                         if (oc instanceof TextInput) ((TextInput) oc).setFocused(false);
                     }
                     ((TextInput) c).setFocused(true);
+                    focusedSettingIndex = i;
                     return true;
                 }
             }
@@ -716,23 +746,6 @@ public class TopZurdoMenuScreen extends Screen {
             return true;
         }
 
-        if (button == 0 && mx >= clothConfigX && mx < clothConfigX + clothConfigW && localMy >= clothConfigY && localMy < clothConfigY + clothConfigH) {
-            try {
-                Screen clothScreen = com.topzurdo.mod.config.TopZurdoClothConfigScreen.create(this);
-                if (clothScreen != null && client != null) client.openScreen(clothScreen);
-            } catch (Throwable t) {
-                if (TopZurdoMod.getInstance() != null) TopZurdoMod.getLogger().warn("[TopZurdo] Cloth Config open failed: {}", t.getMessage());
-            }
-            return true;
-        }
-        if (button == 0 && mx >= footerLogX && mx < footerLogX + footerLogW && localMy >= footerLogY && localMy < footerLogY + footerLogH) {
-            ModConfig cfg = TopZurdoMod.getConfig();
-            if (cfg != null) {
-                cfg.setDebugLogging(!cfg.isDebugLogging());
-                TopZurdoMod.logEvent("Логирование: " + (cfg.isDebugLogging() ? "вкл" : "выкл"));
-            }
-            return true;
-        }
         return super.mouseClicked(mouseX, mouseY, button);
         } catch (Throwable t) {
             if (TopZurdoMod.getInstance() != null) TopZurdoMod.getLogger().error("[TopZurdo] TopZurdoMenuScreen.mouseClicked", t);
@@ -744,6 +757,7 @@ public class TopZurdoMenuScreen extends Screen {
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         try {
         if (button == 0 && (moduleScrollbarDragging || settingsScrollbarDragging)) {
+            saveUIState();
             moduleScrollbarDragging = false;
             settingsScrollbarDragging = false;
             return true;
@@ -801,12 +815,12 @@ public class TopZurdoMenuScreen extends Screen {
         int localMy = (int) toLogicalY(mouseY);
         int off = settingsScroll != null ? settingsScroll.getScrollOffset() : 0;
         int adjMy = localMy + off;
-        int contentBottom = guiTop + guiHeight - OceanTheme.CONTENT_BOTTOM_OFFSET;
+        int contentBottom = guiTop + guiHeight - scaledContentBottomOffset;
 
         int modPanelX = guiLeft + categoryPanelWidth, modPanelW = modulePanelWidth;
-        int modContentTop = guiTop + TITLE_BAR_H + MODULE_PANEL_PAD_TOP;
+        int modContentTop = guiTop + scaledTitleBarH + scaledModulePanelPadTop;
         if (mx >= modPanelX && mx < modPanelX + modPanelW && localMy >= modContentTop && localMy < contentBottom) {
-            if (moduleScroll != null) { moduleScroll.addScroll(delta * SCROLL_DELTA); return true; }
+            if (moduleScroll != null) { moduleScroll.addScroll(-delta * SCROLL_DELTA); return true; }
         }
 
         for (SettingRow row : settingRows) {
@@ -816,9 +830,9 @@ public class TopZurdoMenuScreen extends Screen {
         }
 
         int setPanelX = guiLeft + categoryPanelWidth + modulePanelWidth, setPanelW = settingsPanelWidth;
-        int setContentTop = guiTop + TITLE_BAR_H + OceanTheme.SETTINGS_HEADER_H;
+        int setContentTop = guiTop + scaledTitleBarH + OceanTheme.SETTINGS_HEADER_H;
         if (mx >= setPanelX && mx < setPanelX + setPanelW && localMy >= setContentTop && localMy < contentBottom) {
-            if (settingsScroll != null) { settingsScroll.addScroll(delta * SCROLL_DELTA); return true; }
+            if (settingsScroll != null) { settingsScroll.addScroll(-delta * SCROLL_DELTA); return true; }
         }
         return super.mouseScrolled(mouseX, mouseY, delta);
         } catch (Throwable t) {
@@ -838,22 +852,92 @@ public class TopZurdoMenuScreen extends Screen {
         return super.charTyped(chr, modifiers);
     }
 
+    private int focusedSettingIndex = -1;
+
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        for (SettingRow row : settingRows) {
-            UIComponent c = row.getControl();
+        int focusedIdx = findFocusedSettingIndex();
+        if (focusedIdx >= 0) {
+            UIComponent c = settingRows.get(focusedIdx).getControl();
             if (c instanceof TextInput && ((TextInput) c).isFocused()) {
                 if (((TextInput) c).keyPressed(keyCode, scanCode, modifiers)) return true;
-                if (keyCode == GLFW.GLFW_KEY_ESCAPE) { ((TextInput) c).setFocused(false); return true; }
+                if (keyCode == GLFW.GLFW_KEY_ESCAPE) { clearFocus(); return true; }
+                if (keyCode == GLFW.GLFW_KEY_TAB) {
+                    int dir = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0 ? -1 : 1;
+                    moveFocus(dir);
+                    return true;
+                }
+                return true;
             }
         }
+
+        if (keyCode == GLFW.GLFW_KEY_TAB && !settingRows.isEmpty()) {
+            int dir = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0 ? -1 : 1;
+            moveFocus(dir);
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER || keyCode == GLFW.GLFW_KEY_SPACE) {
+            if (focusedSettingIndex >= 0 && focusedSettingIndex < settingRows.size()) {
+                UIComponent c = settingRows.get(focusedSettingIndex).getControl();
+                if (c instanceof Toggle) {
+                    ((Toggle) c).onMouseClick();
+                    return true;
+                }
+                if (c instanceof Selector) {
+                    ((Selector) c).toggleExpanded();
+                    return true;
+                }
+            }
+        }
+
         if (keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT || keyCode == GLFW.GLFW_KEY_ESCAPE) { onClose(); return true; }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private int findFocusedSettingIndex() {
+        for (int i = 0; i < settingRows.size(); i++) {
+            UIComponent c = settingRows.get(i).getControl();
+            if (c instanceof TextInput && ((TextInput) c).isFocused()) return i;
+        }
+        return -1;
+    }
+
+    private void moveFocus(int direction) {
+        int n = settingRows.size();
+        if (n == 0) return;
+        int idx = focusedSettingIndex < 0 ? (direction > 0 ? 0 : n - 1) : (focusedSettingIndex + direction + n) % n;
+        focusSettingRow(idx);
+    }
+
+    private void focusSettingRow(int index) {
+        clearFocus();
+        focusedSettingIndex = index;
+        UIComponent c = settingRows.get(index).getControl();
+        if (c instanceof TextInput) ((TextInput) c).setFocused(true);
+    }
+
+    private void clearFocus() {
+        focusedSettingIndex = -1;
+        for (SettingRow row : settingRows) {
+            UIComponent c = row.getControl();
+            if (c instanceof TextInput) ((TextInput) c).setFocused(false);
+        }
+    }
+
+    @Override
+    public void removed() {
+        if (handCursor != 0) {
+            GLFW.glfwDestroyCursor(handCursor);
+            handCursor = 0;
+        }
+        super.removed();
     }
 
     @Override
     public void onClose() {
         saveUIState();
+        ModConfig config = TopZurdoMod.getConfig();
+        if (config != null) config.saveImmediate();
         if (client != null) client.openScreen(parent);
     }
 

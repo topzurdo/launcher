@@ -32,4 +32,31 @@ public class ContainerSearcherModule extends Module {
         }
         return itemName.toLowerCase().contains(search.toLowerCase());
     }
+
+    public void setSearchQuery(String query) {
+        searchTerm.setValue(query);
+    }
+
+    public void drawHighlights(net.minecraft.client.gui.screen.ingame.HandledScreen<?> screen, net.minecraft.client.util.math.MatrixStack matrices) {
+        if (!isEnabled()) return;
+        String search = searchTerm.getValue();
+        if (search == null || search.isEmpty()) return;
+
+        for (net.minecraft.screen.slot.Slot slot : screen.getScreenHandler().slots) {
+            net.minecraft.item.ItemStack stack = slot.getStack();
+            if (stack.isEmpty()) continue;
+
+            String name = stack.getName().getString();
+            if (matches(name)) {
+                int x = slot.x;
+                int y = slot.y;
+                int color = 0x8000FF00 | (highlightColor.getValue() & 0xFFFFFF);
+                net.minecraft.client.gui.DrawableHelper.fill(matrices, x, y, x + 16, y + 16, color);
+            }
+        }
+    }
+
+    public void onScreenClosed() {
+        // Nothing to clean up
+    }
 }

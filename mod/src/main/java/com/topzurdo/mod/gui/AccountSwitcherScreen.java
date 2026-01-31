@@ -99,7 +99,7 @@ public class AccountSwitcherScreen extends Screen {
 
         // Текущий ник
         String currentText = "Текущий ник: " + currentUsername;
-        textRenderer.draw(matrices, currentText, px + 50, py + 45, OceanTheme.TEXT_MUTED);
+        textRenderer.draw(matrices, currentText, px + 50, py + 45, com.topzurdo.mod.gui.theme.DesignTokens.fgMuted());
 
         // Рендер поля ввода
         if (usernameField != null) {
@@ -113,7 +113,7 @@ public class AccountSwitcherScreen extends Screen {
 
         // Подсказка
         String hint = "3-16 символов: буквы, цифры, подчёркивание";
-        textRenderer.draw(matrices, hint, px + 50, py + 130, OceanTheme.TEXT_MUTED);
+        textRenderer.draw(matrices, hint, px + 50, py + 130, com.topzurdo.mod.gui.theme.DesignTokens.fgMuted());
 
         super.render(matrices, mouseX, mouseY, delta);
     }

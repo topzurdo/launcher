@@ -160,7 +160,7 @@ public class WorldParticle3D {
     }
 
     public WorldParticle3D setScale(float s) {
-        this.scale = s;
+        this.scale = Math.max(0.1f, Math.min(1.5f, s));
         return this;
     }
 

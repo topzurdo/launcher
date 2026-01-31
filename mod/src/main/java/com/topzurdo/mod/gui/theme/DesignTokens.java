@@ -29,8 +29,8 @@ public final class DesignTokens {
     public static final int XL = 24;
     public static final int XXL = 32;
 
-    // ─── Radius: один 6px для всех элементов (кроме round-кнопок 50%) ───
-    public static final int RADIUS = 6;
+    // ─── Radius: 8px по умолчанию (карточки 12px в компонентах) ───
+    public static final int RADIUS = 8;
     /** Для круглых кнопок — интерпретировать как «половина меньшей стороны». */
     public static final int RADIUS_ROUND = -1;
 
@@ -67,4 +67,7 @@ public final class DesignTokens {
     public static int border()       { return OceanTheme.BORDER; }
     public static int borderSubtle() { return OceanTheme.BORDER_SUBTLE; }
     public static int borderWidth()  { return OceanTheme.BORDER_WIDTH; }
+
+    public static int bgCard()       { return OceanTheme.BG_CARD; }
+    public static int bgTrack()      { return OceanTheme.BG_TRACK; }
 }

@@ -55,7 +55,7 @@ public class CoordinatesModule extends Module {
         }
 
         if (showDirection.getValue()) {
-            float yaw = mc.player.getYaw() % 360;
+            float yaw = mc.player.yaw % 360;
             if (yaw < 0) yaw += 360;
             String dir;
             if (yaw >= 315 || yaw < 45) dir = "South (+Z)";

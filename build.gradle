@@ -1,0 +1,9 @@
+// Root build script for TopZurdo (mod + launcher)
+// Use: gradlew :mod:build  to build the mod only
+
+// Convenience: build mod from root
+tasks.register('buildMod') {
+    dependsOn ':mod:build'
+    group = 'TopZurdo'
+    description = 'Build the TopZurdo mod JAR'
+}

@@ -4,6 +4,7 @@ import com.topzurdo.mod.modules.Module;
 import com.topzurdo.mod.modules.Setting;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.network.PlayerListEntry;
 import net.minecraft.client.network.ServerInfo;
 import net.minecraft.client.util.math.MatrixStack;
 
@@ -43,7 +44,7 @@ public class ServerInfoModule extends Module {
             y += 10;
 
             if (showPing.getValue() && mc.getNetworkHandler() != null) {
-                var playerInfo = mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid());
+                PlayerListEntry playerInfo = mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid());
                 if (playerInfo != null) {
                     int ping = playerInfo.getLatency();
                     int color = ping < 50 ? 0x55FF55 : ping < 100 ? 0xFFFF55 : 0xFF5555;

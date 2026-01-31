@@ -79,4 +79,8 @@ public class CustomCrosshairModule extends Module {
             DrawableHelper.fill(ms, cx, cy, cx + 1, cy + 1, c);
         }
     }
+
+    public void onPlayerAttack() {
+        // Could add animation/effect here
+    }
 }

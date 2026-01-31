@@ -37,4 +37,23 @@ public class ItemLocksModule extends Module {
         if (lockedSlots.contains(slot)) lockedSlots.remove(slot);
         else lockedSlots.add(slot);
     }
+
+    public void toggleSlotLock(int slot) {
+        toggleLock(slot);
+    }
+
+    public boolean shouldHandleMouseClick(int button) {
+        return isEnabled() && button == 0 && org.lwjgl.glfw.GLFW.glfwGetKey(
+            net.minecraft.client.MinecraftClient.getInstance().getWindow().getHandle(),
+            org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_ALT
+        ) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
+    }
+
+    public boolean shouldPreventMove(int slot) {
+        return isEnabled() && isSlotLocked(slot);
+    }
+
+    public boolean shouldPreventDrop(int slot) {
+        return isEnabled() && isSlotLocked(slot);
+    }
 }

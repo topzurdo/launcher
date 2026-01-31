@@ -12,6 +12,8 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,8 +39,8 @@ public class MinecraftDownloader {
 
     // Target versions
     private static final String MC_VERSION = "1.16.5";
-    private static final String FABRIC_VERSION = "0.12.12";
-    private static final String FABRIC_VERSION_ID = "1.16.5-fabric-0.12.12";
+    private static final String FABRIC_VERSION = "0.15.11";
+    private static final String FABRIC_VERSION_ID = "1.16.5-fabric-0.15.11";
     private static final String FABRIC_JSON_URL =
         "https://meta.fabricmc.net/v2/versions/loader/%s/%s/profile/json";
     private static final String MOD_JAR_NAME = "topzurdo-mod-1.0.0.jar";
@@ -116,6 +118,40 @@ public class MinecraftDownloader {
     }
 
     /**
+     * Ensure native libraries (LWJGL .dll etc.) are extracted to gameDir/natives.
+     * Called before launch so that already-installed games get natives if they were missing.
+     */
+    public void ensureNatives(Consumer<String> statusCallback) {
+        Path nativesDir = minecraftDir.resolve("natives");
+        if (Files.exists(nativesDir)) {
+            try {
+                boolean hasNative = Files.list(nativesDir).anyMatch(p -> {
+                    String name = p.getFileName().toString().toLowerCase();
+                    return name.endsWith(".dll") || name.endsWith(".so") || name.endsWith(".dylib");
+                });
+                if (hasNative) {
+                    LOGGER.debug("Natives already present");
+                    return;
+                }
+            } catch (Exception e) {
+                LOGGER.warn("Could not check natives dir: {}", e.getMessage());
+            }
+        }
+        Path versionJsonPath = versionsDir.resolve(MC_VERSION).resolve(MC_VERSION + ".json");
+        if (!Files.exists(versionJsonPath)) {
+            LOGGER.warn("Version JSON not found, cannot ensure natives");
+            return;
+        }
+        try {
+            JsonObject versionJson = GSON.fromJson(Files.readString(versionJsonPath), JsonObject.class);
+            JsonArray libraries = versionJson.getAsJsonArray("libraries");
+            extractNatives(libraries, statusCallback != null ? statusCallback : s -> {});
+        } catch (Exception e) {
+            LOGGER.error("Failed to ensure natives: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
      * Download Minecraft with progress callback
      */
     public void downloadMinecraft(Consumer<Double> progressCallback, Consumer<String> statusCallback)
@@ -176,6 +212,10 @@ public class MinecraftDownloader {
             downloadLibraries(libraries, progress -> {
                 progressCallback.accept(0.40 + progress * 0.30);
             }, statusCallback);
+
+            // Step 4b: Download and extract native libraries (LWJGL etc.) to natives/
+            statusCallback.accept("Распаковка нативных библиотек...");
+            extractNatives(libraries, statusCallback);
 
             // Step 5: Download assets
             JsonObject assetIndex = versionJson.getAsJsonObject("assetIndex");
@@ -258,6 +298,84 @@ public class MinecraftDownloader {
 
         if (downloads.size() > 0 && statusCallback != null) {
             statusCallback.accept(String.format("Загрузка библиотек (%d/%d) завершена", downloads.size(), downloads.size()));
+        }
+    }
+
+    /**
+     * Download native classifier JARs (e.g. natives-windows) and extract them to gameDir/natives
+     * so LWJGL can load lwjgl.dll etc.
+     */
+    private void extractNatives(JsonArray libraries, Consumer<String> statusCallback) throws Exception {
+        Path nativesDir = minecraftDir.resolve("natives");
+        Files.createDirectories(nativesDir);
+        String osName = getOsName();
+
+        List<NativeExtract> toExtract = new ArrayList<>();
+        for (JsonElement elem : libraries) {
+            JsonObject library = elem.getAsJsonObject();
+            if (!library.has("natives")) continue;
+            JsonObject natives = library.getAsJsonObject("natives");
+            if (!natives.has(osName)) continue;
+            String classifierKey = natives.get(osName).getAsString();
+            JsonObject downloads = library.getAsJsonObject("downloads");
+            if (downloads == null || !downloads.has("classifiers")) continue;
+            JsonObject classifiers = downloads.getAsJsonObject("classifiers");
+            if (!classifiers.has(classifierKey)) continue;
+            JsonObject classifierEntry = classifiers.getAsJsonObject(classifierKey);
+            String path = classifierEntry.get("path").getAsString();
+            String url = classifierEntry.get("url").getAsString();
+            Path jarPath = librariesDir.resolve(path);
+            toExtract.add(new NativeExtract(url, jarPath, classifierEntry.has("size") ? classifierEntry.get("size").getAsLong() : 0));
+        }
+
+        for (int i = 0; i < toExtract.size(); i++) {
+            NativeExtract ne = toExtract.get(i);
+            if (statusCallback != null) {
+                statusCallback.accept(String.format("Нативные библиотеки (%d/%d)...", i + 1, toExtract.size()));
+            }
+            if (!Files.exists(ne.jarPath)) {
+                Files.createDirectories(ne.jarPath.getParent());
+                downloadFile(ne.url, ne.jarPath, ne.size, p -> {});
+            }
+            extractZipTo(ne.jarPath, nativesDir);
+        }
+        if (statusCallback != null && !toExtract.isEmpty()) {
+            statusCallback.accept("Нативные библиотеки распакованы");
+        }
+    }
+
+    private void extractZipTo(Path zipPath, Path destDir) throws Exception {
+        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipPath))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.isDirectory()) continue;
+                if (entry.getName().startsWith("META-INF/")) continue;
+                Path out = destDir.resolve(entry.getName()).normalize();
+                Path destAbs = destDir.toAbsolutePath().normalize();
+                if (!out.toAbsolutePath().normalize().startsWith(destAbs)) continue; // security: no zip slip
+                Files.createDirectories(out.getParent());
+                try (FileOutputStream fos = new FileOutputStream(out.toFile())) {
+                    byte[] buf = new byte[8192];
+                    int len;
+                    while ((len = zis.read(buf)) > 0) {
+                        fos.write(buf, 0, len);
+                    }
+                }
+                zis.closeEntry();
+            }
+        }
+        LOGGER.info("Extracted natives from {} to {}", zipPath, destDir);
+    }
+
+    private static class NativeExtract {
+        final String url;
+        final Path jarPath;
+        final long size;
+
+        NativeExtract(String url, Path jarPath, long size) {
+            this.url = url;
+            this.jarPath = jarPath;
+            this.size = size;
         }
     }
 
@@ -361,27 +479,28 @@ public class MinecraftDownloader {
             return;
         }
 
-        // DEV MODE: Look for mod in project directory
+        // DEV MODE: Look for mod in project directory. When running via "gradlew :launcher:run",
+        // user.dir is often the launcher subdirectory, so try both user.dir and its parent (repo root).
         if (DEV_MODE) {
-            Path projectRoot = Path.of(System.getProperty("user.dir")).getParent();
-            if (projectRoot == null) {
-                projectRoot = Path.of(System.getProperty("user.dir"));
-            }
-
-            Path[] candidates = new Path[] {
-                projectRoot.resolve("mod").resolve("build").resolve("libs").resolve(MOD_JAR_NAME)
-            };
-
-            for (Path candidate : candidates) {
-                if (candidate != null && Files.exists(candidate)) {
-                    Files.copy(candidate, modJar, StandardCopyOption.REPLACE_EXISTING);
-                    LOGGER.info("TopZurdo mod installed from project: {}", modJar);
-                    return;
+            Path cwd = Path.of(System.getProperty("user.dir"));
+            Path[] possibleRoots = { cwd, cwd.getParent() };
+            String[] jarNames = { "topzurdo-1.0.0.jar", MOD_JAR_NAME };
+            for (Path projectRoot : possibleRoots) {
+                if (projectRoot == null) continue;
+                Path modLibs = projectRoot.resolve("mod").resolve("build").resolve("libs");
+                for (String jarName : jarNames) {
+                    Path candidate = modLibs.resolve(jarName);
+                    if (Files.exists(candidate)) {
+                        Files.copy(candidate, modJar, StandardCopyOption.REPLACE_EXISTING);
+                        LOGGER.info("TopZurdo mod installed from project: {}", modJar);
+                        return;
+                    }
                 }
             }
         }
 
-        throw new RuntimeException("TopZurdo mod JAR not found in launcher or project");
+        throw new RuntimeException(
+            "TopZurdo mod JAR not found. Build the mod first: run .\\gradlew.bat :mod:build from project root, then start the launcher again.");
     }
 
     /**
@@ -425,14 +544,20 @@ public class MinecraftDownloader {
             throw new RuntimeException("Vanilla version " + MC_VERSION + " must be installed first");
         }
 
-        // Download Fabric profile JSON
+        // Download Fabric profile JSON (fallback to bundled profile if meta.fabricmc.net is unreachable)
         statusCallback.accept("Fabric: загрузка профиля...");
         String fabricJsonUrl = String.format(FABRIC_JSON_URL, MC_VERSION, FABRIC_VERSION);
         LOGGER.info("Downloading Fabric profile from: {}", fabricJsonUrl);
 
-        JsonObject fabricProfile = downloadJson(fabricJsonUrl);
+        JsonObject fabricProfile = null;
+        try {
+            fabricProfile = downloadJson(fabricJsonUrl);
+        } catch (Exception e) {
+            LOGGER.warn("Could not download Fabric profile ({}), trying bundled profile", e.getMessage());
+            fabricProfile = loadBundledFabricProfile();
+        }
         if (fabricProfile == null) {
-            throw new RuntimeException("Failed to download Fabric profile");
+            throw new RuntimeException("Failed to load Fabric profile (meta.fabricmc.net unreachable and no bundled profile)");
         }
 
         // Extract version info from Fabric profile
@@ -497,13 +622,17 @@ public class MinecraftDownloader {
      * Resolve library path from library JSON object
      */
     private Path resolveLibraryPath(JsonObject library) {
+        return resolveLibraryPath(library, librariesDir);
+    }
+
+    private Path resolveLibraryPath(JsonObject library, Path libDir) {
         // First try downloads.artifact format (standard Minecraft)
         JsonObject downloads = library.getAsJsonObject("downloads");
         if (downloads != null) {
             JsonObject artifact = downloads.getAsJsonObject("artifact");
             if (artifact != null && artifact.has("path")) {
                 String path = artifact.get("path").getAsString();
-                return librariesDir.resolve(path);
+                return libDir.resolve(path);
             }
         }
 
@@ -512,11 +641,77 @@ public class MinecraftDownloader {
             String name = library.get("name").getAsString();
             String path = buildMavenPath(name);
             if (path != null) {
-                return librariesDir.resolve(path);
+                return libDir.resolve(path);
             }
         }
 
         return null;
+    }
+
+    /**
+     * Check if a library rule matches current OS (for "rules" array in version JSON).
+     */
+    private static boolean ruleMatches(JsonObject rule) {
+        if (!rule.has("os")) return true;
+        JsonObject os = rule.getAsJsonObject("os");
+        if (!os.has("name")) return true;
+        String ruleOs = os.get("name").getAsString();
+        return getOsName().equals(ruleOs);
+    }
+
+    /**
+     * Whether this library should be included on current OS (evaluate "rules").
+     */
+    private static boolean libraryMatchesRules(JsonObject library) {
+        if (!library.has("rules")) return true;
+        JsonArray rules = library.getAsJsonArray("rules");
+        for (JsonElement e : rules) {
+            JsonObject rule = e.getAsJsonObject();
+            if (ruleMatches(rule)) {
+                return "allow".equals(rule.get("action").getAsString());
+            }
+        }
+        return false; // no matching rule -> disallow (e.g. lwjgl 3.2.1 only has allow+osx, so exclude on Windows)
+    }
+
+    /**
+     * Build classpath library list from version JSONs with OS rules applied.
+     * Excludes OS-specific libraries (e.g. lwjgl 3.2.1 on Windows) to avoid native version mismatch crash.
+     */
+    public List<Path> getClasspathLibraries(Path gameDir) throws Exception {
+        Path libDir = gameDir.resolve("libraries");
+        Path versDir = gameDir.resolve("versions");
+        List<Path> out = new ArrayList<>();
+        java.util.Set<Path> seen = new java.util.HashSet<>();
+
+        // Vanilla 1.16.5 libraries (with rules)
+        Path vanillaJson = versDir.resolve(MC_VERSION).resolve(MC_VERSION + ".json");
+        if (Files.exists(vanillaJson)) {
+            JsonObject vanilla = GSON.fromJson(Files.readString(vanillaJson), JsonObject.class);
+            JsonArray libs = vanilla.getAsJsonArray("libraries");
+            for (JsonElement e : libs) {
+                JsonObject lib = e.getAsJsonObject();
+                if (!libraryMatchesRules(lib)) continue;
+                Path p = resolveLibraryPath(lib, libDir);
+                if (p != null && Files.exists(p) && seen.add(p)) out.add(p);
+            }
+        }
+
+        // Fabric profile libraries (no OS rules in practice)
+        Path fabricJson = versDir.resolve(FABRIC_VERSION_ID).resolve(FABRIC_VERSION_ID + ".json");
+        if (Files.exists(fabricJson)) {
+            JsonObject fabric = GSON.fromJson(Files.readString(fabricJson), JsonObject.class);
+            if (fabric.has("libraries")) {
+                JsonArray libs = fabric.getAsJsonArray("libraries");
+                for (JsonElement e : libs) {
+                    JsonObject lib = e.getAsJsonObject();
+                    Path p = resolveLibraryPath(lib, libDir);
+                    if (p != null && Files.exists(p) && seen.add(p)) out.add(p);
+                }
+            }
+        }
+
+        return out;
     }
 
     /**
@@ -543,7 +738,7 @@ public class MinecraftDownloader {
             classifier = "-" + parts[3];
         }
 
-        return String.format("%s/%s/%s/%s%s-%s%s.%s",
+        return String.format("%s/%s/%s/%s-%s%s.%s",
             groupId, artifactId, version, artifactId, version, classifier, ext);
     }
 
@@ -560,13 +755,32 @@ public class MinecraftDownloader {
             }
         }
 
-        // Fallback to Maven central
+        // Fallback: Maven-style (Fabric profile has "name" + optional "url" base; vanilla fallback was libraries.minecraft.net)
         if (library.has("name")) {
             String name = library.get("name").getAsString();
-            return "https://libraries.minecraft.net/" + buildMavenPath(name);
+            String path = buildMavenPath(name);
+            if (path == null) return null;
+            String baseUrl;
+            if (library.has("url")) {
+                baseUrl = library.get("url").getAsString();
+                if (!baseUrl.endsWith("/")) baseUrl += "/";
+            } else {
+                baseUrl = getMavenBaseUrl(name);
+            }
+            return baseUrl + path;
         }
 
         return null;
+    }
+
+    /**
+     * Maven base URL when library has no "url" (e.g. vanilla-style JSON). Fabric/net.fabricmc -> maven.fabricmc.net; rest -> Maven Central.
+     */
+    private String getMavenBaseUrl(String mavenName) {
+        if (mavenName.startsWith("net.fabricmc:") || mavenName.startsWith("net.fabricmc.")) {
+            return "https://maven.fabricmc.net/";
+        }
+        return "https://repo1.maven.org/maven2/";
     }
 
     /**
@@ -623,6 +837,20 @@ public class MinecraftDownloader {
         }
 
         LOGGER.info("Downloaded: {} ({} bytes)", targetPath, Files.size(targetPath));
+    }
+
+    /**
+     * Load Fabric profile from bundled resource when meta.fabricmc.net is unreachable (e.g. DNS block).
+     */
+    private JsonObject loadBundledFabricProfile() {
+        String resourcePath = "/fabric/1.16.5-fabric-0.15.11-profile.json";
+        try (InputStream is = getClass().getResourceAsStream(resourcePath)) {
+            if (is == null) return null;
+            return GSON.fromJson(new InputStreamReader(is), JsonObject.class);
+        } catch (Exception e) {
+            LOGGER.debug("Bundled Fabric profile not found or invalid: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**

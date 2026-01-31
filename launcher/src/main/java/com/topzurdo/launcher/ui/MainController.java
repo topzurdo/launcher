@@ -7,6 +7,7 @@ import com.topzurdo.launcher.Constants;
 import com.topzurdo.launcher.TopZurdoLauncher;
 import com.topzurdo.launcher.config.JvmProfile;
 import com.topzurdo.launcher.config.LauncherConfig;
+import com.topzurdo.launcher.config.LauncherMetadata;
 import com.topzurdo.launcher.config.theme.ThemeManager;
 import com.topzurdo.launcher.service.AuthService;
 import com.topzurdo.launcher.service.DownloadService;
@@ -14,6 +15,7 @@ import com.topzurdo.launcher.service.GameService;
 import com.topzurdo.launcher.service.LauncherServices;
 import com.topzurdo.launcher.service.OptimizationModService;
 import com.topzurdo.launcher.service.ServerStatusService;
+import com.topzurdo.launcher.ui.components.SmartOptimizationDialog;
 import com.topzurdo.launcher.ui.components.StatusPill;
 import com.topzurdo.launcher.ui.effects.EffectsEngine;
 import com.topzurdo.launcher.ui.views.AboutView;
@@ -33,7 +35,9 @@ import javafx.scene.control.DialogPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.Parent;
 import javafx.scene.layout.StackPane;
+import javafx.stage.Stage;
 import javafx.util.Duration;
 
 /**
@@ -59,8 +63,19 @@ public class MainController {
     private AboutView aboutView;
 
     private String currentPanel = "home";
-    private boolean effectsEnabled = true;
     private boolean hotkeysInstalled;
+    private Parent root;
+    private Stage stage;
+    private double dragOffsetX;
+    private double dragOffsetY;
+
+    public MainController(Stage stage) {
+        this.stage = stage;
+        init();
+        this.root = createView();
+    }
+
+    public Parent getRoot() { return root; }
 
     public void init() {
         LOGGER.info("Initializing Zurdo Launcher");
@@ -109,11 +124,16 @@ public class MainController {
         }));
 
         checkServerStatus();
-        mainView.getNavRail().setVersion("v1.0.0 | MC 1.16.5");
+        LauncherMetadata meta = LauncherMetadata.load();
+        mainView.getNavRail().setVersion(meta.getVersionLine());
+        homeView.setVersionStat(meta.getLoader() + " " + meta.getMcVersion());
         checkExistingAuth();
 
         root.sceneProperty().addListener((o, old, scene) -> {
-            if (scene != null && !hotkeysInstalled) setupHotkeys(scene);
+            if (scene != null) {
+                if (!hotkeysInstalled) setupHotkeys(scene);
+                applyAccentColor();
+            }
         });
 
         playEntranceAnimation(mainView);
@@ -135,8 +155,12 @@ public class MainController {
                 settingsView.getRamSlider().setValue(rec);
                 settingsView.getRamLabel().setText(rec + " MB");
                 settingsView.getRamSlider().setDisable(true);
+                long totalMbRam = com.topzurdo.launcher.util.OSUtils.getTotalMemoryMb();
+                if (totalMbRam <= 0) totalMbRam = 8192;
+                settingsView.setRamBreakdown(rec, totalMbRam);
             } else {
                 settingsView.getRamSlider().setDisable(false);
+                settingsView.hideRamBreakdown();
             }
         });
 
@@ -159,7 +183,8 @@ public class MainController {
     }
 
     private void loadUserSettings() {
-        if (config.getUsername() != null) homeView.getUsernameField().setText(config.getUsername());
+        if (config.getUsername() != null) homeView.setUsername(config.getUsername());
+        homeView.setNicknameHistory(config.getNicknameHistory());
         settingsView.getRamSlider().setValue(config.getAllocatedRamMb());
         settingsView.getRamLabel().setText(config.getAllocatedRamMb() + " MB");
         if (config.getJavaPath() != null) settingsView.getJavaPathField().setText(config.getJavaPath());
@@ -190,7 +215,14 @@ public class MainController {
             settingsView.getRamSlider().setValue(rec);
             settingsView.getRamLabel().setText(rec + " MB");
             settingsView.getRamSlider().setDisable(true);
+            long totalMbRam = com.topzurdo.launcher.util.OSUtils.getTotalMemoryMb();
+            if (totalMbRam <= 0) totalMbRam = 8192;
+            settingsView.setRamBreakdown(rec, totalMbRam);
+        } else {
+            settingsView.hideRamBreakdown();
         }
+        settingsView.getCustomColorCheck().setSelected(config.isCustomColorEnabled());
+        settingsView.setPreferredColorRGB(config.getPreferredColor());
     }
 
     private void setupServiceCallbacks() {
@@ -237,6 +269,7 @@ public class MainController {
             }
         });
         settingsView.getInstallOptModsButton().setOnAction(e -> onInstallOptMods());
+        settingsView.getApplyBestButton().setOnAction(e -> onApplyBestSettingsWithDialog());
     }
 
     private void wireTitleBar() {
@@ -246,15 +279,25 @@ public class MainController {
         pill.setCursor(javafx.scene.Cursor.HAND);
         Tooltip.install(pill, new Tooltip("Нажмите для повторной проверки"));
         pill.setOnMouseClicked(e -> checkServerStatus());
+        // Перетаскивание окна за шапку (не за кнопки)
+        javafx.scene.Node titleBar = mainView.getTitleBar();
+        titleBar.setOnMousePressed(e -> {
+            if (e.getTarget() instanceof javafx.scene.control.Button) return;
+            dragOffsetX = e.getScreenX() - stage.getX();
+            dragOffsetY = e.getScreenY() - stage.getY();
+        });
+        titleBar.setOnMouseDragged(e -> {
+            if (e.getTarget() instanceof javafx.scene.control.Button) return;
+            stage.setX(e.getScreenX() - dragOffsetX);
+            stage.setY(e.getScreenY() - dragOffsetY);
+        });
+        titleBar.setCursor(javafx.scene.Cursor.DEFAULT);
     }
 
     private void wireNav() {
         mainView.getNavRail().getHome().setOnAction(e -> showPanel("home"));
         mainView.getNavRail().getSettings().setOnAction(e -> showPanel("settings"));
         mainView.getNavRail().getAbout().setOnAction(e -> showPanel("about"));
-        mainView.getNavRail().getEffectsBtn().setSelected(effectsEnabled);
-        mainView.getNavRail().getEffectsBtn().setText(effectsEnabled ? "Эффекты" : "○ Эффекты");
-        mainView.getNavRail().getEffectsBtn().setOnAction(e -> onToggleEffects());
     }
 
     private void setupHotkeys(Scene scene) {
@@ -297,9 +340,15 @@ public class MainController {
             if (status.hasError()) {
                 pill.setStatus(StatusPill.Status.ERROR);
                 pill.setText(Constants.Messages.SERVER_ERROR_RETRY);
+                mainView.getTitleBar().setWipeBannerVisible(false);
             } else {
                 pill.setStatus(status.isOnline() ? StatusPill.Status.OK : StatusPill.Status.ERROR);
-                pill.setText(status.isOnline() ? Constants.Messages.SERVER_ONLINE : Constants.Messages.SERVER_OFFLINE);
+                String text = status.isOnline() ? Constants.Messages.SERVER_ONLINE : Constants.Messages.SERVER_OFFLINE;
+                if (status.isOnline() && status.players >= 0 && status.maxPlayers > 0) {
+                    text = text + " (" + status.players + "/" + status.maxPlayers + ")";
+                }
+                pill.setText(text);
+                mainView.getTitleBar().setWipeBannerVisible(status.isRecentWipe());
             }
             Tooltip.install(pill, new Tooltip(status.getHost() != null ? status.getHost() : "—"));
         }));
@@ -316,6 +365,7 @@ public class MainController {
         mainView.getTitleBar().setAuthVisible(false);
         homeView.setMicrosoftLoginVisible(false);
         homeView.setUsername("Player");
+        homeView.setNicknameHistory(config.getNicknameHistory());
         homeView.getStatusLabel().setText("Готов к запуску");
     }
 
@@ -360,17 +410,13 @@ public class MainController {
     }
 
     private void onPlayClicked() {
-        // Используем дефолтный ник "Player" если не установлен
-        String u = homeView.getUsernameField().getText().trim();
-        if (u == null || u.isEmpty()) {
-            u = "Player";
-        }
-        // Валидация ника (3-16 символов)
-        if (u.length() < 3 || u.length() > 16 || !u.matches("^[a-zA-Z0-9_]+$")) {
-            u = "Player"; // Дефолт если некорректный
-        }
+        String u = homeView.getNicknameText();
+        if (u == null || (u = u.trim()).isEmpty()) u = "Player";
+        if (u.length() < 3 || u.length() > 16 || !u.matches("^[a-zA-Z0-9_]+$")) u = "Player";
+        config.addUsernameToHistory(u);
         config.setUsername(u);
         config.save();
+        homeView.setNicknameHistory(config.getNicknameHistory());
         if (downloadService == null) {
             showElegantError("Ошибка", "Сервис загрузки ещё не инициализирован. Подождите несколько секунд.");
             return;
@@ -444,7 +490,7 @@ public class MainController {
         if (gameService.isLaunchInProgress()) return;
         homeView.getPlayButton().setDisable(true);
         homeView.getPlayButton().setText("ЗАПУСК...");
-        if (effectsEnabled && effectsEngine != null) {
+        if (effectsEngine != null) {
             StackPane root = (StackPane) mainView.getParent();
             if (root != null)
                 effectsEngine.triggerBurst("main-particles", root.getWidth() / 2, root.getHeight() / 2, Constants.Particles.BURST_COUNT);
@@ -453,23 +499,6 @@ public class MainController {
             Platform.runLater(() -> { resetPlayButton(); showElegantError("Прерывание запуска", e.getMessage()); });
             return false;
         });
-    }
-
-    private void onToggleEffects() {
-        effectsEnabled = mainView.getNavRail().getEffectsBtn().isSelected();
-        if (effectsEngine == null) {
-            effectsEnabled = false;
-            mainView.getNavRail().getEffectsBtn().setSelected(false);
-            mainView.getNavRail().getEffectsBtn().setText("○ Эффекты");
-            return;
-        }
-        if (effectsEnabled) {
-            effectsEngine.enableEffects();
-            mainView.getNavRail().getEffectsBtn().setText("Эффекты");
-        } else {
-            effectsEngine.disableEffects();
-            mainView.getNavRail().getEffectsBtn().setText("○ Эффекты");
-        }
     }
 
     private void onCloseClicked() {
@@ -522,6 +551,23 @@ public class MainController {
             }));
     }
 
+    private void onApplyBestSettingsWithDialog() {
+        SmartOptimizationDialog dialog = new SmartOptimizationDialog();
+        styleDialogPane(dialog.getDialogPane());
+        dialog.show();
+        dialog.runScan(() -> {
+            onApplyBestSettings();
+            dialog.close();
+            showElegantInfo("Готово", "Настройки подобраны под ваш ПК: RAM " + config.getAllocatedRamMb() + " MB, профиль JVM «" + JvmProfile.fromId(config.getJvmProfile()).getDisplayName() + "». Нажмите «Сохранено» или сохраните другие изменения.");
+        });
+    }
+
+    private void onApplyBestSettings() {
+        config.applyBestDefaults();
+        config.save();
+        loadUserSettings();
+    }
+
     private void onSaveSettings() {
         int ramMb = config.isAutoRam() ? LauncherConfig.getRecommendedRam() : (int) settingsView.getRamSlider().getValue();
         config.setAllocatedRamMb(ramMb);
@@ -532,6 +578,8 @@ public class MainController {
         config.setFabricDebugLogging(settingsView.getFabricDebugCheck().isSelected());
         config.setLightTheme(settingsView.getLightThemeCheck().isSelected());
         config.setAutoRam(settingsView.getAutoRamCheck().isSelected());
+        config.setCustomColorEnabled(settingsView.getCustomColorCheck().isSelected());
+        config.setPreferredColor(settingsView.getPreferredColorRGB());
         String sel = settingsView.getJvmProfileCombo().getValue();
         for (JvmProfile p : JvmProfile.values()) {
             if (p.getDisplayName().equals(sel)) {
@@ -555,7 +603,22 @@ public class MainController {
             config.setLastServer(port == Constants.DEFAULT_PORT ? host : host + ":" + port);
         }
         config.save();
+        applyAccentColor();
         showElegantInfo("Сохранено", Constants.Messages.SETTINGS_SAVED);
+    }
+
+    /** Применяет цвет акцента из конфига к корню сцены (-accent), если включён свой цвет. */
+    private void applyAccentColor() {
+        javafx.scene.Scene sc = mainView != null ? mainView.getScene() : null;
+        if (sc == null) return;
+        javafx.scene.Node root = sc.getRoot();
+        if (root == null) return;
+        if (config.isCustomColorEnabled()) {
+            String hex = "#" + config.getPreferredColorHex();
+            root.setStyle("-accent: " + hex + "; -accent-muted: " + hex + "4d; -accent-hover: " + hex + ";");
+        } else {
+            root.setStyle("");
+        }
     }
 
     private void onResetSettings() {
@@ -571,7 +634,10 @@ public class MainController {
         settingsView.getResolutionCombo().setValue("1920x1080");
         settingsView.getServerField().setText(Constants.DEFAULT_SERVER);
         settingsView.getPortField().setText(String.valueOf(Constants.DEFAULT_PORT));
+        settingsView.getCustomColorCheck().setSelected(false);
+        settingsView.setPreferredColorRGB(0x22D3EE);
         applyThemeFromSettings(); // apply dark theme after reset
+        applyAccentColor();
         showElegantInfo("Сброшено", Constants.Messages.SETTINGS_RESET);
     }
 
@@ -602,12 +668,15 @@ public class MainController {
     }
 
     private void styleDialog(Alert a) {
-        DialogPane dp = a.getDialogPane();
+        styleDialogPane(a.getDialogPane());
+        Node c = a.getDialogPane().lookup(".content.label");
+        if (c != null) c.setStyle("-fx-text-fill: " + Constants.HEX_TEXT + "; -fx-font-size: 13px; -fx-font-family: 'Segoe UI', sans-serif;");
+    }
+
+    private void styleDialogPane(DialogPane dp) {
         dp.setStyle("-fx-background-color: " + Constants.HEX_BG + "; -fx-border-color: " + Constants.HEX_BORDER_SUBTLE + "; -fx-border-width: 1px; -fx-border-radius: 12px; -fx-background-radius: 12px;");
         Node h = dp.lookup(".header-panel");
         if (h != null) h.setStyle("-fx-background-color: " + Constants.HEX_BG_DARK + ";");
-        Node c = dp.lookup(".content.label");
-        if (c != null) c.setStyle("-fx-text-fill: " + Constants.HEX_TEXT + "; -fx-font-size: 13px; -fx-font-family: 'Segoe UI', sans-serif;");
     }
 
     public void shutdown() {

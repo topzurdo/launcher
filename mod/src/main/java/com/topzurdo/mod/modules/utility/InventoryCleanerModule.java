@@ -40,7 +40,7 @@ public class InventoryCleanerModule extends Module {
         if (now - lastDrop < delay.getValue()) return;
 
         for (int i = 9; i < 36; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.inventory.getStack(i);
             if (shouldDrop(stack)) {
                 mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, i, 1, SlotActionType.THROW, mc.player);
                 lastDrop = now;

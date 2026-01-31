@@ -16,7 +16,7 @@ public class Label {
     private float scale;
 
     public Label(int x, int y, String text) {
-        this(x, y, text, OceanTheme.TEXT_PRIMARY, 1.0f);
+        this(x, y, text, com.topzurdo.mod.gui.theme.DesignTokens.fgPrimary(), 1.0f);
     }
 
     public Label(int x, int y, String text, int color, float scale) {

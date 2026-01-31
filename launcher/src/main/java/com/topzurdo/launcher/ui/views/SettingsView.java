@@ -9,6 +9,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
 import javafx.scene.control.TextField;
@@ -24,6 +25,8 @@ public class SettingsView extends VBox {
 
     private final Slider ramSlider;
     private final Label ramLabel;
+    private final Label ramBreakdownLabel;
+    private final ProgressBar ramBreakdownBarRef;
     private final TextField javaPathField;
     private final ComboBox<String> resolutionCombo;
     private final ComboBox<String> versionCombo;
@@ -38,6 +41,7 @@ public class SettingsView extends VBox {
     private final ComboBox<String> jvmProfileCombo;
     private final Button installOptModsBtn;
     private final Button browseJavaBtn;
+    private final Button applyBestBtn;
     private final Button saveBtn;
     private final Button resetBtn;
 
@@ -72,8 +76,17 @@ public class SettingsView extends VBox {
         ramRow.getChildren().addAll(ramSlider, ramLabel);
         autoRamCheck = new CheckBox("Автоопределение RAM (50–70% памяти)");
         autoRamCheck.getStyleClass().add("gold-check");
+        ramBreakdownLabel = new Label();
+        ramBreakdownLabel.getStyleClass().add("hint-text");
+        ramBreakdownLabel.setWrapText(true);
+        ramBreakdownLabel.setVisible(false);
+        ProgressBar ramBreakdownBar = new ProgressBar(0.25);
+        ramBreakdownBar.setPrefWidth(400);
+        ramBreakdownBar.getStyleClass().add("gold-slider");
+        ramBreakdownBar.setVisible(false);
+        ramBreakdownBarRef = ramBreakdownBar;
         VBox ramContent = new VBox(DesignTokens.SPACING_12);
-        ramContent.getChildren().addAll(ramRow, autoRamCheck);
+        ramContent.getChildren().addAll(ramRow, autoRamCheck, ramBreakdownLabel, ramBreakdownBar);
         VBox ram = section("ВЫДЕЛЕНИЕ РЕСУРСОВ", ramContent, "Рекомендуем 4-8 GB. Авто — 50–70% доступной памяти");
 
         jvmProfileCombo = new ComboBox<>();
@@ -183,6 +196,12 @@ public class SettingsView extends VBox {
         VBox visualEffects = section("ВИЗУАЛЬНЫЕ ЭФФЕКТЫ", colorRow,
             "Выберите цвет для частиц, облаков и эффектов в игре");
 
+        applyBestBtn = new Button("◆ ПОДОБРАТЬ ПОД МОЙ ПК");
+        applyBestBtn.getStyleClass().add("preset-btn");
+        applyBestBtn.setPrefHeight(44);
+        VBox applyBestSection = section("АВТОНАСТРОЙКА", applyBestBtn,
+            "RAM, профиль JVM и рекомендуемые значения под ваш компьютер");
+
         saveBtn = new Button("СОХРАНИТЬ");
         saveBtn.getStyleClass().add("save-btn");
         saveBtn.setPrefSize(180, 50);
@@ -192,7 +211,7 @@ public class SettingsView extends VBox {
         HBox btns = new HBox(DesignTokens.SPACING_24, saveBtn, resetBtn);
         btns.setAlignment(Pos.CENTER);
 
-        form.getChildren().addAll(ram, jvmProfile, optMods, java, res, ver, srv, opts, visualEffects, btns);
+        form.getChildren().addAll(applyBestSection, ram, jvmProfile, optMods, java, res, ver, srv, opts, visualEffects, btns);
 
         ScrollPane scroll = new ScrollPane(form);
         scroll.getStyleClass().add("settings-scroll");
@@ -233,6 +252,7 @@ public class SettingsView extends VBox {
     public CheckBox getAutoRamCheck() { return autoRamCheck; }
     public ComboBox<String> getJvmProfileCombo() { return jvmProfileCombo; }
     public Button getInstallOptModsButton() { return installOptModsBtn; }
+    public Button getApplyBestButton() { return applyBestBtn; }
     public Button getSaveButton() { return saveBtn; }
     public Button getResetButton() { return resetBtn; }
 
@@ -259,4 +279,27 @@ public class SettingsView extends VBox {
         int b = rgb & 0xFF;
         preferredColorPicker.setValue(Color.rgb(r, g, b));
     }
+
+    /** Показать разбивку RAM при авто: [Minecraft: X GB] [Всего: Y GB]. */
+    public void setRamBreakdown(int minecraftMb, long totalMb) {
+        if (totalMb <= 0) totalMb = 8192;
+        double minecraftGb = minecraftMb / 1024.0;
+        double totalGb = totalMb / 1024.0;
+        double share = totalGb > 0 ? minecraftGb / totalGb : 0.25;
+        ramBreakdownLabel.setText(String.format("Minecraft: %.1f GB  |  Всего RAM: %.1f GB  |  Доля: %.0f%%",
+            minecraftGb, totalGb, share * 100));
+        ramBreakdownLabel.setVisible(true);
+        if (ramBreakdownBarRef != null) {
+            ramBreakdownBarRef.setProgress(Math.min(1.0, share));
+            ramBreakdownBarRef.setVisible(true);
+        }
+    }
+
+    public void hideRamBreakdown() {
+        ramBreakdownLabel.setVisible(false);
+        if (ramBreakdownBarRef != null) ramBreakdownBarRef.setVisible(false);
+    }
+
+    public Label getRamBreakdownLabel() { return ramBreakdownLabel; }
+    public ProgressBar getRamBreakdownBarRef() { return ramBreakdownBarRef; }
 }

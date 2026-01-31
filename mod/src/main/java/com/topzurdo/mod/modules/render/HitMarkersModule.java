@@ -35,6 +35,12 @@ public class HitMarkersModule extends Module {
         markers.add(new HitMarker(System.currentTimeMillis()));
     }
 
+    public void onPlayerAttack() {
+        if (isEnabled()) {
+            addMarker();
+        }
+    }
+
     @Override
     public void onRender(float partialTicks) {
         if (!isEnabled()) return;

@@ -16,13 +16,15 @@ import net.minecraft.text.LiteralText;
  */
 public class CustomMainMenuScreen extends Screen {
 
-    // Более компактная панель (увеличена высота для новой кнопки)
-    private static final int PANEL_W = 400;
-    private static final int PANEL_H = 440;
-    private static final int BTN_W = 320;
-    private static final int BTN_H = 48;
-    private static final int BTN_GAP = 16;
-    private static final int CARD_PAD = 40;
+    // Компактная панель; снизу запас под панель задач Windows (~72px)
+    private static final int MARGIN_TOP = 28;
+    private static final int MARGIN_BOTTOM = 72;
+    private static final int PANEL_W = 340;
+    private static final int PANEL_H = 332;
+    private static final int BTN_W = 280;
+    private static final int BTN_H = 38;
+    private static final int BTN_GAP = 8;
+    private static final int CARD_PAD = 26;
 
     // Анимация
     private float openAnimation = 0f;
@@ -40,8 +42,8 @@ public class CustomMainMenuScreen extends Screen {
         openAnimation = 0f;
 
         int cx = width / 2;
-        int py = height / 2 - PANEL_H / 2;
-        int startY = py + 120;
+        int py = clampPanelY(height);
+        int startY = py + 88;
 
         // Кнопки с иконками и золотым стилем
         addButton(new NeonButton(cx - BTN_W / 2, startY, BTN_W, BTN_H,
@@ -85,13 +87,21 @@ public class CustomMainMenuScreen extends Screen {
         }
     }
 
+    /** Панель не вылезает за верх/низ экрана */
+    private int clampPanelY(int h) {
+        int centerY = h / 2 - PANEL_H / 2;
+        if (centerY < MARGIN_TOP) return MARGIN_TOP;
+        if (centerY + PANEL_H > h - MARGIN_BOTTOM) return h - PANEL_H - MARGIN_BOTTOM;
+        return centerY;
+    }
+
     @Override
     public void render(MatrixStack m, int mouseX, int mouseY, float partial) {
         UIRenderHelper.setPartialTicks(partial);
 
         int cx = width / 2;
         int px = cx - PANEL_W / 2;
-        int py = height / 2 - PANEL_H / 2;
+        int py = clampPanelY(height);
 
         // Ease-out анимация
         float eased = easeOutCubic(openAnimation);
@@ -123,18 +133,19 @@ public class CustomMainMenuScreen extends Screen {
         // Подзаголовок
         String sub = "Твой путь к победе";
         int subAlpha = (int)(180 * eased);
-        int subColor = (subAlpha << 24) | (OceanTheme.TEXT_DIM & 0x00FFFFFF);
-        textRenderer.draw(m, sub, cx - textRenderer.getWidth(sub) / 2f, py + CARD_PAD + 50, subColor);
+        int subColor = (subAlpha << 24) | (com.topzurdo.mod.gui.theme.DesignTokens.fgSecondary() & 0x00FFFFFF);
+        textRenderer.draw(m, sub, cx - textRenderer.getWidth(sub) / 2f, py + CARD_PAD + 38, subColor);
 
         // Декоративная линия
-        int lineY = py + CARD_PAD + 68;
-        int lineW = (int)(100 * eased);
+        int lineY = py + CARD_PAD + 52;
+        int lineW = (int)(80 * eased);
         drawGradientLine(m, cx - lineW, lineY, lineW * 2);
 
-        // Версия внизу
+        // Версия внизу — строго выше зоны панели задач
         String version = "TopZurdo v1.0.0 • Minecraft 1.16.5";
+        int versionY = Math.min(height - MARGIN_BOTTOM + 12, py + PANEL_H - 4);
         textRenderer.draw(m, version, cx - textRenderer.getWidth(version) / 2f,
-            height - 20, UIRenderHelper.withAlpha(OceanTheme.TEXT_MUTED, 0.5f));
+            versionY, UIRenderHelper.withAlpha(com.topzurdo.mod.gui.theme.DesignTokens.fgMuted(), 0.5f));
 
         super.render(m, mouseX, mouseY, partial);
     }
@@ -226,7 +237,7 @@ public class CustomMainMenuScreen extends Screen {
     private void drawAnimatedTitle(MatrixStack m, int cx, int ty) {
         String title = "TOPZURDO";
         int tw = textRenderer.getWidth(title);
-        float scale = 2.5f;
+        float scale = 1.9f;
 
         // Пульсирующее свечение
         float glowIntensity = 0.15f + titleGlow * 0.1f;

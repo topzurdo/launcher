@@ -93,6 +93,19 @@ public class ModConfig {
                     if (method instanceof String) {
                         menuOpenMethod = (String) method;
                     }
+
+                    Object cat = data.get("lastCategory");
+                    if (cat instanceof String) lastCategory = (String) cat;
+                    Object mid = data.get("lastModuleId");
+                    if (mid instanceof String) lastModuleId = (String) mid;
+                    Object mso = data.get("moduleScrollOffset");
+                    if (mso instanceof Number) moduleScrollOffset = ((Number) mso).intValue();
+                    Object sso = data.get("settingsScrollOffset");
+                    if (sso instanceof Number) settingsScrollOffset = ((Number) sso).intValue();
+                    Object dbg = data.get("debugLogging");
+                    if (dbg instanceof Boolean) debugLogging = (Boolean) dbg;
+                    Object mka = data.get("menuKeyAlternative");
+                    if (mka instanceof Number) menuKeyAlternative = ((Number) mka).intValue();
                 }
                 TopZurdoMod.getLogger().info("[TopZurdo] Configuration loaded");
             }
@@ -109,6 +122,18 @@ public class ModConfig {
         }
     }
 
+    /** Write config to disk immediately (e.g. when closing menu so state is not lost). */
+    public void saveImmediate() {
+        synchronized (saveLock) {
+            if (pendingSave != null) {
+                pendingSave.cancel(false);
+                pendingSave = null;
+            }
+        }
+        dirty.set(true);
+        doSave();
+    }
+
     private void doSave() {
         if (!dirty.getAndSet(false)) return;
         try {
@@ -118,6 +143,12 @@ public class ModConfig {
             synchronized (moduleStates) { data.put("moduleStates", new HashMap<>(moduleStates)); }
             synchronized (moduleSettings) { data.put("moduleSettings", new HashMap<>(moduleSettings)); }
             data.put("menuOpenMethod", menuOpenMethod);
+            data.put("lastCategory", lastCategory);
+            data.put("lastModuleId", lastModuleId);
+            data.put("moduleScrollOffset", Integer.valueOf(moduleScrollOffset));
+            data.put("settingsScrollOffset", Integer.valueOf(settingsScrollOffset));
+            data.put("debugLogging", Boolean.valueOf(debugLogging));
+            data.put("menuKeyAlternative", Integer.valueOf(menuKeyAlternative));
 
             Files.writeString(configFile, GSON.toJson(data));
         } catch (IOException e) {
@@ -141,6 +172,11 @@ public class ModConfig {
         }
     }
 
+    public Object getModuleSetting(String moduleId, String settingId, Object defaultValue) {
+        Object val = getModuleSetting(moduleId, settingId);
+        return val != null ? val : defaultValue;
+    }
+
     public void setModuleSetting(String moduleId, String settingId, Object value) {
         synchronized (moduleSettings) {
             moduleSettings.computeIfAbsent(moduleId, k -> new HashMap<>()).put(settingId, value);
@@ -150,4 +186,26 @@ public class ModConfig {
 
     public String getMenuOpenMethod() { return menuOpenMethod; }
     public void setMenuOpenMethod(String method) { this.menuOpenMethod = method; save(); }
+
+    // UI state persistence
+    private String lastCategory = "RENDER";
+    private String lastModuleId = "";
+    private int moduleScrollOffset = 0;
+    private int settingsScrollOffset = 0;
+    private boolean debugLogging = false;
+
+    public String getLastCategory() { return lastCategory; }
+    public void setLastCategory(String cat) { this.lastCategory = cat; save(); }
+    public String getLastModuleId() { return lastModuleId; }
+    public void setLastModuleId(String id) { this.lastModuleId = id; save(); }
+    public int getModuleScrollOffset() { return moduleScrollOffset; }
+    public void setModuleScrollOffset(int off) { this.moduleScrollOffset = off; save(); }
+    public int getSettingsScrollOffset() { return settingsScrollOffset; }
+    public void setSettingsScrollOffset(int off) { this.settingsScrollOffset = off; save(); }
+    public boolean isDebugLogging() { return debugLogging; }
+    public void setDebugLogging(boolean on) { this.debugLogging = on; save(); }
+
+    private int menuKeyAlternative = 0; // 0 = none, GLFW key code otherwise
+    public int getMenuKeyAlternative() { return menuKeyAlternative; }
+    public void setMenuKeyAlternative(int key) { this.menuKeyAlternative = key; save(); }
 }

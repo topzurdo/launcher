@@ -3,10 +3,9 @@
   "minVersion": "0.8",
   "package": "com.topzurdo.mod.patches.mixins",
   "compatibilityLevel": "JAVA_8",
-  "refmap": "topzurdo-mod-refmap.json",
+  "refmap": "topzurdo-refmap.json",
   "mixins": [],
   "client": [
-    "ClientWorldPropertiesMixin",
     "GameRendererMixin",
     "HandledScreenAccessor",
     "InGameHudMixin",

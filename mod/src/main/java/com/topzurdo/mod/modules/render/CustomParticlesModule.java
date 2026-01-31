@@ -143,7 +143,8 @@ public class CustomParticlesModule extends Module {
 
         VertexConsumerProvider.Immediate consumers = VertexConsumerProvider.immediate(Tessellator.getInstance().getBuffer());
 
-        for (WorldParticle3D p : particles) {
+        List<WorldParticle3D> copy = new ArrayList<>(particles);
+        for (WorldParticle3D p : copy) {
             matrices.push();
 
             // Interpolate position
@@ -156,8 +157,9 @@ public class CustomParticlesModule extends Module {
             // Billboard rotation (face camera)
             matrices.multiply(camera.getRotation());
 
-            // Scale (inverted Y because text renders down) - ULTRA small for PvP
-            float s = 0.012f * p.scale * (0.2f + 0.8f * p.getAlpha());
+            // Scale: base 0.06 so setting 1.0 is clearly visible; user scale 0.1-1.5 applied
+            float scaleClamped = Math.max(0.1f, Math.min(1.5f, p.scale));
+            float s = 0.06f * scaleClamped * (0.2f + 0.8f * p.getAlpha());
             matrices.scale(-s, -s, s);
 
             String text = getSymbol(p.shape);

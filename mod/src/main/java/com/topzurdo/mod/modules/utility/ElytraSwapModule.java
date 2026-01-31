@@ -31,7 +31,7 @@ public class ElytraSwapModule extends Module {
 
         // Find swap item in inventory
         for (int i = 0; i < 36; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.inventory.getStack(i);
             if (hasElytra) {
                 // Looking for chestplate
                 if (stack.getItem() == Items.DIAMOND_CHESTPLATE || 

@@ -130,7 +130,14 @@ public class TrailsModule extends Module {
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableCull();
         RenderSystem.disableDepthTest();
-        RenderSystem.lineWidth(2f);
+
+        String currentStyle = style.getValue();
+        if (currentStyle == null) currentStyle = "line";
+        int baseColor = trailColor.getValue();
+        float width = trailWidth.getValue();
+        // Толщина линии: для line — из настройки (масштаб 4–20 px), для ribbon — в рендере
+        float linePx = Math.max(1f, Math.min(20f, width * 40f));
+        RenderSystem.lineWidth(linePx);
 
         matrices.push();
         matrices.translate(-camPos.x, -camPos.y, -camPos.z);
@@ -138,12 +145,6 @@ public class TrailsModule extends Module {
         Matrix4f matrix = matrices.peek().getModel();
         Tessellator tessellator = Tessellator.getInstance();
         BufferBuilder buffer = tessellator.getBuffer();
-
-        String currentStyle = style.getValue();
-        if (currentStyle == null) currentStyle = "line";
-
-        int baseColor = trailColor.getValue();
-        float width = trailWidth.getValue();
 
         if ("ribbon".equals(currentStyle) || "rainbow".equals(currentStyle)) {
             renderRibbon(buffer, tessellator, matrix, baseColor, width, "rainbow".equals(currentStyle));

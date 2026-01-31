@@ -2,6 +2,7 @@ package com.topzurdo.mod.gui.components.atoms;
 
 import java.util.function.Consumer;
 
+import com.topzurdo.mod.gui.GuiUtil;
 import com.topzurdo.mod.gui.UIComponent;
 import com.topzurdo.mod.gui.UIRenderHelper;
 import com.topzurdo.mod.gui.theme.DesignTokens;
@@ -35,8 +36,12 @@ public final class ColorPicker implements UIComponent {
     private boolean draggingHue = false;
     private boolean draggingSV = false;
 
-    // UI dimensions
+    // UI dimensions: explicit zones to avoid overlap
+    /** Left zone for color swatch (px). */
+    private static final int SWATCH_ZONE = 24;
     private static final int SWATCH_SIZE = 20;
+    /** Right zone for hex text: full "#FFFFFF" + padding (px). */
+    private static final int HEX_ZONE = 52;
     private static final int HUE_BAR_HEIGHT = 10;
     private static final int SV_BOX_SIZE = 50;
     private static final int SPACING = 4;
@@ -47,7 +52,7 @@ public final class ColorPicker implements UIComponent {
     public ColorPicker(int x, int y, int width, int height, String label, int initialColor, Consumer<Integer> onChange) {
         this.x = x;
         this.y = y;
-        this.width = Math.max(100, width);
+        this.width = Math.max(120, width);
         this.height = Math.max(24, height);
         this.label = label != null ? label : "";
         this.colorRGB = initialColor;
@@ -200,15 +205,15 @@ public final class ColorPicker implements UIComponent {
     }
 
     private void updateHueFromMouse(int mx) {
-        int hueBarX = x + SWATCH_SIZE + SPACING;
-        int hueBarWidth = width - SWATCH_SIZE - SPACING * 2;
+        int hueBarX = x + SWATCH_ZONE + SPACING;
+        int hueBarWidth = width - SWATCH_ZONE - SPACING * 2;
         float progress = MathHelper.clamp((float)(mx - hueBarX) / hueBarWidth, 0f, 1f);
         hue = progress;
         updateColorFromHSV();
     }
 
     private void updateSVFromMouse(int mx, int my) {
-        int svBoxX = x + SWATCH_SIZE + SPACING;
+        int svBoxX = x + SWATCH_ZONE + SPACING;
         int svBoxY = y + height + SPACING + HUE_BAR_HEIGHT + SPACING;
 
         saturation = MathHelper.clamp((float)(mx - svBoxX) / SV_BOX_SIZE, 0f, 1f);
@@ -217,23 +222,24 @@ public final class ColorPicker implements UIComponent {
     }
 
     private boolean isOverSwatch(int mx, int my) {
-        return mx >= x && mx < x + SWATCH_SIZE && my >= y && my < y + SWATCH_SIZE;
+        int swatchX = x + (SWATCH_ZONE - SWATCH_SIZE) / 2;
+        int swatchY = y + (height - SWATCH_SIZE) / 2;
+        return mx >= swatchX && mx < swatchX + SWATCH_SIZE && my >= swatchY && my < swatchY + SWATCH_SIZE;
     }
 
     private boolean isOverHueBar(int mx, int my) {
-        int hueBarX = x + SWATCH_SIZE + SPACING;
+        int hueBarX = x + SWATCH_ZONE + SPACING;
         int hueBarY = y + height + SPACING;
-        int hueBarWidth = width - SWATCH_SIZE - SPACING * 2;
+        int hueBarWidth = width - SWATCH_ZONE - SPACING * 2;
         return mx >= hueBarX && mx < hueBarX + hueBarWidth && my >= hueBarY && my < hueBarY + HUE_BAR_HEIGHT;
     }
 
     private boolean isOverSVBox(int mx, int my) {
-        int svBoxX = x + SWATCH_SIZE + SPACING;
+        int svBoxX = x + SWATCH_ZONE + SPACING;
         int svBoxY = y + height + SPACING + HUE_BAR_HEIGHT + SPACING;
         return mx >= svBoxX && mx < svBoxX + SV_BOX_SIZE && my >= svBoxY && my < svBoxY + SV_BOX_SIZE;
     }
 
-    @Override
     public void render(MatrixStack ms, int mouseX, int mouseY) {
         TextRenderer fr = MinecraftClient.getInstance().textRenderer;
         if (fr == null) return;
@@ -245,27 +251,31 @@ public final class ColorPicker implements UIComponent {
         UIRenderHelper.fill(ms, x, y, x + width, y + height, bg);
         UIRenderHelper.drawBorder1px(ms, x, y, width, height, hover ? (DesignTokens.accentBase() & 0x99FFFFFF) : DesignTokens.borderSubtle());
 
-        // Label
-        String lbl = label;
-        if (lbl.length() > 15) lbl = lbl.substring(0, 12) + "...";
-        fr.draw(ms, lbl, (float)(x + SWATCH_SIZE + SPACING * 2), (float)(y + (height - 8) / 2),
-            hover ? DesignTokens.fgPrimary() : DesignTokens.fgSecondary());
+        // Color swatch (left zone)
+        int swatchX = x + (SWATCH_ZONE - SWATCH_SIZE) / 2;
+        int swatchY = y + (height - SWATCH_SIZE) / 2;
+        DrawableHelper.fill(ms, swatchX, swatchY, swatchX + SWATCH_SIZE, swatchY + SWATCH_SIZE, 0xFF000000 | colorRGB);
+        UIRenderHelper.drawBorder1px(ms, swatchX, swatchY, SWATCH_SIZE, SWATCH_SIZE, DesignTokens.borderSubtle());
 
-        // Color swatch (always visible)
-        int swatchX = x + 4;
-        int swatchY = y + (height - 16) / 2;
-        DrawableHelper.fill(ms, swatchX, swatchY, swatchX + 16, swatchY + 16, 0xFF000000 | colorRGB);
-        UIRenderHelper.drawBorder1px(ms, swatchX, swatchY, 16, 16, DesignTokens.borderSubtle());
-
-        // Hex value
-        String hex = String.format("#%06X", colorRGB);
-        int hexW = fr.getWidth(hex);
-        fr.draw(ms, hex, (float)(x + width - hexW - 6), (float)(y + (height - 8) / 2), DesignTokens.accentBase());
-
-        // Expanded picker
-        if (expanded) {
-            renderExpandedPicker(ms, fr, mouseX, mouseY);
+        // Optional label (middle zone): only if width allows
+        int middleStart = x + SWATCH_ZONE + SPACING;
+        int middleEnd = x + width - HEX_ZONE - SPACING;
+        if (middleEnd > middleStart + 20 && label != null && !label.isEmpty()) {
+            String lbl = GuiUtil.truncate(fr, label, middleEnd - middleStart - 4);
+            fr.draw(ms, lbl, (float) middleStart, (float) (y + (height - 8) / 2),
+                hover ? DesignTokens.fgPrimary() : DesignTokens.fgSecondary());
         }
+
+        // Hex value (right zone): full "#FFFFFF" or truncate only when necessary
+        if (width >= SWATCH_ZONE + HEX_ZONE) {
+            String hex = String.format("#%06X", colorRGB);
+            int hexMaxW = HEX_ZONE - 8;
+            if (fr.getWidth(hex) > hexMaxW) hex = GuiUtil.truncate(fr, hex, hexMaxW);
+            int hexW = fr.getWidth(hex);
+            int hexX = x + width - HEX_ZONE + (HEX_ZONE - hexW) / 2;
+            fr.draw(ms, hex, (float) hexX, (float) (y + (height - 8) / 2), DesignTokens.accentBase());
+        }
+        // Expanded picker is rendered by parent after scissor is disabled (see TopZurdoMenuScreen)
     }
 
     private void renderExpandedPicker(MatrixStack ms, TextRenderer fr, int mouseX, int mouseY) {
@@ -346,4 +356,45 @@ public final class ColorPicker implements UIComponent {
     public boolean isExpanded() { return expanded; }
 
     public void collapse() { expanded = false; }
+
+    /** Renders only the expanded palette; call after scissor is disabled so it is not clipped. */
+    public void renderExpandedPart(MatrixStack ms, int mouseX, int mouseY) {
+        if (!expanded) return;
+        TextRenderer fr = MinecraftClient.getInstance().textRenderer;
+        if (fr == null) return;
+        ms.push();
+        ms.translate(0, 0, 200);
+        renderExpandedPicker(ms, fr, mouseX, mouseY);
+        ms.pop();
+    }
+
+    @Override
+    public boolean isMouseOver(double mouseX, double mouseY) {
+        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + getHeight();
+    }
+
+    @Override
+    public void render(MatrixStack ms, int mouseX, int mouseY, float delta) {
+        render(ms, mouseX, mouseY); // delegate to existing render
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        return mouseDragged(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+        return false;
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        return false;
+    }
+
+    @Override
+    public boolean charTyped(char chr, int modifiers) {
+        return false;
+    }
 }

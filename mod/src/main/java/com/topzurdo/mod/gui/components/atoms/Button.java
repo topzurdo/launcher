@@ -40,7 +40,7 @@ public class Button {
         int textWidth = tr.getWidth(text);
         int textX = x + (width - textWidth) / 2;
         int textY = y + (height - 8) / 2;
-        tr.draw(ms, text, textX, textY, OceanTheme.TEXT_PRIMARY);
+        tr.draw(ms, text, textX, textY, com.topzurdo.mod.gui.theme.DesignTokens.fgPrimary());
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {

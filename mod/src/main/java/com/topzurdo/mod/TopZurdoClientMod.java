@@ -10,7 +10,6 @@ import com.topzurdo.mod.patches.DemoDisabler;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
@@ -36,7 +35,7 @@ import net.minecraft.client.util.InputUtil;
  */
 public class TopZurdoClientMod implements ClientModInitializer {
 
-    public static KeyBinding menuKey;
+    public static KeyBinding menuKey; // unused, kept for compatibility
     private boolean lastMenuKeyDown = false;
     private boolean demoDisableRetried = false;
 
@@ -51,6 +50,7 @@ public class TopZurdoClientMod implements ClientModInitializer {
         try {
             config = new ModConfig();
             config.load();
+            TopZurdoMod.setConfig(config);
             String preferred = config.getMenuOpenMethod();
             if (preferred != null && !"auto".equals(preferred)) {
                 TopZurdoMod.getLogger().info("[TopZurdo] Preferred menu open method: {} (from config)", preferred);
@@ -64,17 +64,18 @@ public class TopZurdoClientMod implements ClientModInitializer {
             TopZurdoMod.getLogger().info("[TopZurdo] Demo mode disabled via reflection");
         }
 
-        menuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+        menuKey = new KeyBinding(
             "key.topzurdo.menu",
             InputUtil.Type.KEYSYM,
             GLFW.GLFW_KEY_RIGHT_SHIFT,
             "key.categories.topzurdo"
-        ));
-        TopZurdoMod.getLogger().info("[TopZurdo] KeyBinding Right Shift registered");
+        );
+        TopZurdoMod.getLogger().info("[TopZurdo] Menu key: Right Shift (polled via GLFW)");
 
         try {
             moduleManager = new ModuleManager();
             moduleManager.init();
+            TopZurdoMod.setModuleManager(moduleManager);
             TopZurdoMod.getLogger().info("[TopZurdo] {} modules loaded; press Right Shift to open menu", moduleManager.getModuleCount());
         } catch (Exception e) {
             TopZurdoMod.getLogger().error("[TopZurdo] Module manager init failed: {}", e.getMessage(), e);
@@ -144,7 +145,7 @@ public class TopZurdoClientMod implements ClientModInitializer {
 
         HudRenderCallback.EVENT.register((matrixStack, tickDelta) -> {
             if (moduleManager != null) {
-                moduleManager.onRender(matrixStack, tickDelta);
+                moduleManager.onRender(tickDelta);
             }
         });
 
@@ -233,12 +234,22 @@ public class TopZurdoClientMod implements ClientModInitializer {
                 TopZurdoMod.getLogger().warn("[TopZurdo] [Tick] GLFW poll error", t);
             }
 
-            if (!opened && menuKey != null && menuKey.wasPressed()) {
+            boolean rshift = false;
+            boolean altDown = false;
+            try {
+                if (client.getWindow() != null) {
+                    long win = client.getWindow().getHandle();
+                    rshift = (GLFW.glfwGetKey(win, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS);
+                    altDown = (alt != 0 && GLFW.glfwGetKey(win, alt) == GLFW.GLFW_PRESS);
+                }
+            } catch (Throwable t) { }
+            boolean keyDown = rshift || altDown;
+            if (!opened && keyDown && !lastMenuKeyDown) {
                 if (config != null) config.setMenuOpenMethod("keybinding");
-                lastMenuKeyDown = true;
-                TopZurdoMod.logEvent("KeyBinding.consumeClick: opening");
+                TopZurdoMod.logEvent("KeyBinding: opening");
                 openModMenu(client);
             }
+            lastMenuKeyDown = keyDown;
         } else {
             try {
                 if (client.getWindow() != null) {
@@ -263,6 +274,20 @@ public class TopZurdoClientMod implements ClientModInitializer {
 
         if (moduleManager != null) {
             moduleManager.onTick();
+            // Zoom: hold C to zoom (key polled so it works in-game)
+            com.topzurdo.mod.modules.Module zoomMod = moduleManager.getModule("zoom");
+            if (zoomMod != null && zoomMod instanceof com.topzurdo.mod.modules.render.ZoomModule) {
+                boolean zoomKey = false;
+                if (zoomMod.isEnabled()) {
+                    try {
+                        if (client.getWindow() != null) {
+                            long win = client.getWindow().getHandle();
+                            zoomKey = (GLFW.glfwGetKey(win, GLFW.GLFW_KEY_C) == GLFW.GLFW_PRESS);
+                        }
+                    } catch (Throwable t) { }
+                }
+                ((com.topzurdo.mod.modules.render.ZoomModule) zoomMod).setZooming(zoomKey);
+            }
         }
     }
 

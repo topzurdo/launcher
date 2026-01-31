@@ -9,6 +9,7 @@ import org.lwjgl.opengl.GL11;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.topzurdo.mod.gui.GuiUtil;
 import com.topzurdo.mod.gui.UIComponent;
+import com.topzurdo.mod.gui.OceanTheme;
 import com.topzurdo.mod.gui.UIRenderHelper;
 import com.topzurdo.mod.gui.theme.DesignTokens;
 
@@ -25,6 +26,8 @@ public final class Selector implements UIComponent {
 
     private static final int ROW_H = 20;
     private static final int ARROW_W = 12;
+    /** Reserved right zone for value + arrow so label and value do not overlap. */
+    private static final int VALUE_ZONE = 80;
 
     private int x, y;
     private final int width, height;
@@ -107,7 +110,6 @@ public final class Selector implements UIComponent {
         return GuiUtil.resolveKey(s);
     }
 
-    @Override
     public void render(MatrixStack ms, int mouseX, int mouseY) {
         TextRenderer fr = MinecraftClient.getInstance().textRenderer;
         if (fr == null) return;
@@ -115,7 +117,8 @@ public final class Selector implements UIComponent {
         if (options.isEmpty()) {
             UIRenderHelper.fill(ms, x, y, x + width, y + height, 0x08ffffff);
             UIRenderHelper.drawBorder1px(ms, x, y, width, height, DesignTokens.borderSubtle());
-            fr.draw(ms, GuiUtil.truncate(fr, label, Math.max(60, width - 88)), (float) (x + 10), (float) (y + (height - 8) / 2), DesignTokens.fgDisabled());
+            int labelMaxW = Math.max(20, width - VALUE_ZONE - 10);
+            fr.draw(ms, GuiUtil.truncate(fr, label, labelMaxW), (float) (x + 10), (float) (y + (height - 8) / 2), DesignTokens.fgDisabled());
             return;
         }
 
@@ -127,38 +130,50 @@ public final class Selector implements UIComponent {
         if (expanded)
             UIRenderHelper.fill(ms, x, y, x + 3, y + height, DesignTokens.accentBase() & 0x99FFFFFF);
 
-        String lbl = GuiUtil.truncate(fr, label, Math.max(60, width - 88));
+        int labelMaxW = Math.max(20, width - VALUE_ZONE - 10);
+        String lbl = GuiUtil.truncate(fr, label, labelMaxW);
         int txt = hover || expanded ? DesignTokens.fgPrimary() : DesignTokens.fgSecondary();
         fr.draw(ms, lbl, (float) (x + 10), (float) (y + (height - 8) / 2), txt);
 
         String cur = resolve(getValue());
         int vw = fr.getWidth(cur);
-        fr.draw(ms, cur, (float) (x + width - ARROW_W - vw - 8), (float) (y + (height - 8) / 2), DesignTokens.accentBase());
+        int valueZoneStart = x + width - VALUE_ZONE;
+        int valueX = valueZoneStart + Math.max(4, (VALUE_ZONE - ARROW_W - vw - 4) / 2);
+        fr.draw(ms, cur, (float) valueX, (float) (y + (height - 8) / 2), DesignTokens.accentBase());
         fr.draw(ms, expanded ? "▲" : "▼", (float) (x + width - ARROW_W - 4), (float) (y + (height - 8) / 2), DesignTokens.accentActive());
 
-        if (expanded) {
-            renderExpandedList(ms, fr, mouseX, mouseY);
-        }
+        // Expanded list is rendered by parent in second pass (renderExpandedPart) so it draws on top
+    }
+
+    /**
+     * Compute dropdown list Y position. Flips above the button if it would overflow visible bottom.
+     */
+    private int getDropdownListY(int visibleBottomY, int scrollOffset) {
+        int listH = Math.min(options.size() * ROW_H, 5 * ROW_H);
+        int dropdownBottomScreen = (y + height) + listH - scrollOffset;
+        return (dropdownBottomScreen > visibleBottomY) ? (y - listH) : (y + height);
     }
 
     /**
      * Render expanded dropdown list with smooth animation.
      * Rendered above other content with higher z-index.
      */
-    private void renderExpandedList(MatrixStack ms, TextRenderer fr, int mouseX, int mouseY) {
-        int listY = y + height;
+    private void renderExpandedList(MatrixStack ms, TextRenderer fr, int mouseX, int mouseY, int visibleBottomY, int scrollOffset) {
         int listH = Math.min(options.size() * ROW_H, 5 * ROW_H); // Max 5 visible rows
+        int listY = getDropdownListY(visibleBottomY, scrollOffset);
         int totalH = options.size() * ROW_H;
         boolean needsScroll = totalH > listH;
+        int radius = DesignTokens.RADIUS;
 
         // Push matrix for z-ordering (render above other elements)
         ms.push();
         ms.translate(0, 0, 100); // Higher z-index
 
-        // Background with subtle shadow
-        UIRenderHelper.fill(ms, x - 2, listY, x + width + 2, listY + listH + 4, 0x40000000); // Shadow
-        UIRenderHelper.fill(ms, x, listY, x + width, listY + listH, DesignTokens.bgPanel());
-        UIRenderHelper.drawBorder1px(ms, x, listY, width, listH, DesignTokens.accentBase() & 0xAAFFFFFF);
+        // Shadow below dropdown
+        UIRenderHelper.drawShadow(ms, x, listY, width, listH, 4);
+        // Background: rounded panel
+        UIRenderHelper.fillRoundRect(ms, x, listY, width, listH, radius, OceanTheme.BG_INNER);
+        UIRenderHelper.drawRoundBorder(ms, x, listY, width, listH, radius, 1, DesignTokens.accentBase() & 0xAAFFFFFF);
 
         // Render visible options
         int maxVisible = Math.min(options.size(), 5);
@@ -182,8 +197,8 @@ public final class Selector implements UIComponent {
                 UIRenderHelper.fill(ms, x, rowY, x + 3, rowY + ROW_H, DesignTokens.success());
             }
 
-            // Text color based on state
-            int tc = sel ? DesignTokens.success() : (rh ? DesignTokens.fgPrimary() : DesignTokens.fgSecondary());
+            // Text color: always high contrast so options are readable
+            int tc = sel ? DesignTokens.success() : (rh ? DesignTokens.fgPrimary() : DesignTokens.fgPrimary());
             fr.draw(ms, resolve(options.get(optIndex)), (float) (x + 10), (float) (rowY + (ROW_H - 8) / 2), tc);
         }
 
@@ -196,6 +211,24 @@ public final class Selector implements UIComponent {
         ms.pop();
     }
 
+    /** Renders only the expanded dropdown; call after scissor is disabled so it draws on top of everything. */
+    public void renderExpandedPart(MatrixStack ms, int mouseX, int mouseY, int visibleBottomY, int scrollOffset) {
+        if (!expanded || options.isEmpty()) return;
+        TextRenderer fr = MinecraftClient.getInstance().textRenderer;
+        if (fr == null) return;
+        ms.push();
+        ms.translate(0, 0, 400); // Above ColorPicker expanded (200)
+        renderExpandedList(ms, fr, mouseX, mouseY, visibleBottomY, scrollOffset);
+        ms.pop();
+    }
+
+    public boolean isExpanded() { return expanded; }
+
+    /** Toggle dropdown for keyboard activation. */
+    public void toggleExpanded() {
+        if (!options.isEmpty()) expanded = !expanded;
+    }
+
     @Override
     public int getX() { return x; }
     @Override
@@ -204,4 +237,42 @@ public final class Selector implements UIComponent {
     public int getWidth() { return width; }
     @Override
     public int getHeight() { return getTotalHeight(); }
+
+    @Override
+    public boolean isMouseOver(double mouseX, double mouseY) {
+        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + getTotalHeight();
+    }
+
+    /** True when mouse is over the dropdown list only (not the button). Used so overlay click priority doesn't steal clicks from rows below. */
+    public boolean isMouseOverDropdown(int mx, int my, int visibleBottomY, int scrollOffset) {
+        if (!expanded || options.isEmpty()) return false;
+        int listH = Math.min(options.size() * ROW_H, 5 * ROW_H);
+        int listY = getDropdownListY(visibleBottomY, scrollOffset);
+        return mx >= x && mx < x + width && my >= listY && my < listY + listH;
+    }
+
+    @Override
+    public void render(MatrixStack ms, int mouseX, int mouseY, float delta) {
+        render(ms, mouseX, mouseY); // delegate to existing render
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        return false;
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        return false;
+    }
+
+    @Override
+    public boolean charTyped(char chr, int modifiers) {
+        return false;
+    }
 }

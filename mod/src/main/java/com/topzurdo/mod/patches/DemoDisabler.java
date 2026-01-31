@@ -12,6 +12,11 @@ import java.lang.reflect.Field;
 public class DemoDisabler {
 
     private static final Logger LOG = LogManager.getLogger("DemoDisabler");
+    private static boolean disabled = false;
+
+    public static boolean isDisabled() {
+        return disabled;
+    }
 
     public static boolean disable() {
         try {
@@ -21,6 +26,7 @@ public class DemoDisabler {
             // Check if already not in demo mode
             if (!mc.isDemo()) {
                 LOG.info("Game is not in demo mode, no patch needed");
+                disabled = true;
                 return true;
             }
 
@@ -33,6 +39,7 @@ public class DemoDisabler {
                     if (name.contains("demo")) {
                         field.setBoolean(mc, false);
                         LOG.info("Demo mode disabled via field: {}", field.getName());
+                        disabled = true;
                         return true;
                     }
                 }

@@ -27,7 +27,6 @@ public class ClientWorldPropertiesMixin {
     private void onGetTimeOfDay(CallbackInfoReturnable<Long> cir) {
         ModuleManager mm = TopZurdoMod.getModuleManager();
         if (mm == null) return;
-
         TimeChangerModule module = (TimeChangerModule) mm.getModule("time_changer");
         if (module != null && module.isEnabled()) {
             cir.setReturnValue((long) module.getTargetTime());
