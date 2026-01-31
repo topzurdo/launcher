@@ -17,6 +17,14 @@ public class ArmorHUDModule extends Module {
     private Setting<Integer> posY;
     private Setting<Boolean> showDurability;
 
+    /**
+     * Creates the Armor HUD module and registers its configurable settings.
+     *
+     * Registers:
+     * - posX: horizontal position (default 10, range 0–2000)
+     * - posY: vertical position (default 10, range 0–2000)
+     * - showDurability: whether to display item durability (default true)
+     */
     public ArmorHUDModule() {
         super("armor_hud", "Armor HUD", "Отображение брони", Category.HUD);
 
@@ -25,11 +33,22 @@ public class ArmorHUDModule extends Module {
         showDurability = addSetting(Setting.ofBoolean("show_durability", "Прочность", "Показывать прочность", true));
     }
 
+    /**
+     * Provide the HUD bounding rectangle based on the module's current position settings.
+     *
+     * @return an int[] containing [x, y, width, height] where x and y are the current posX and posY values, width is 80 and height is 90
+     */
     @Override
     public int[] getHudBounds() {
         return new int[] { posX.getValue(), posY.getValue(), 80, 90 };
     }
 
+    /**
+     * Renders the player's equipped armor items at the module's configured position and, if enabled,
+     * overlays each item's durability as a "current/max" string colored by remaining percentage.
+     *
+     * @param partialTicks interpolation value for the current render frame
+     */
     @Override
     public void onRender(float partialTicks) {
         if (!isEnabled()) return;

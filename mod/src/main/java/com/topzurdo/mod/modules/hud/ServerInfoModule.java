@@ -18,6 +18,16 @@ public class ServerInfoModule extends Module {
     private Setting<Boolean> showPing;
     private Setting<Boolean> showPlayers;
 
+    /**
+     * Creates the ServerInfoModule and registers its HUD settings.
+     *
+     * Initializes the module with id "server_info", display name "Server Info",
+     * description "Информация о сервере", and category HUD. Adds the following settings:
+     * - "pos_x" (Позиция X): horizontal position, default 900, range 0–2000
+     * - "pos_y" (Позиция Y): vertical position, default 380, range 0–2000
+     * - "show_ping" (Пинг): toggle ping display, default true
+     * - "show_players" (Игроки): toggle player count display, default true
+     */
     public ServerInfoModule() {
         super("server_info", "Server Info", "Информация о сервере", Category.HUD);
 
@@ -27,11 +37,25 @@ public class ServerInfoModule extends Module {
         showPlayers = addSetting(Setting.ofBoolean("show_players", "Игроки", "Показывать кол-во игроков", true));
     }
 
+    /**
+     * Provides the HUD bounding rectangle for this module.
+     *
+     * @return an int array [x, y, width, height] representing the HUD bounds, where x and y are the configured horizontal and vertical positions
+     */
     @Override
     public int[] getHudBounds() {
         return new int[] { posX.getValue(), posY.getValue(), 120, 40 };
     }
 
+    /**
+     * Renders server-related HUD information (server address, ping, and player count) at the configured X/Y position.
+     *
+     * If server info is available, draws the server address and, depending on settings, the player's ping and the current player count.
+     * If no server info is available, displays "Singleplayer".
+     * No rendering occurs when the module is disabled or when there is no active player.
+     *
+     * @param partialTicks partial render tick time used for interpolation during rendering
+     */
     @Override
     public void onRender(float partialTicks) {
         if (!isEnabled()) return;

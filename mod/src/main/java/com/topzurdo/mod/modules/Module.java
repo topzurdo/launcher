@@ -80,12 +80,21 @@ public abstract class Module {
 
     protected void onEnable() {}
     protected void onDisable() {}
-    public void onTick() {}
-    public void onRender(float partialTicks) {}
+    /**
+ * Invoked once per game tick to allow the module to perform periodic updates.
+ */
+public void onTick() {}
+    /**
+ * Called each render frame to perform module-specific rendering.
+ *
+ * @param partialTicks fraction of a tick elapsed since the last game tick, used to interpolate visual state between ticks
+ */
+public void onRender(float partialTicks) {}
 
     /**
-     * For HUD modules with pos_x/pos_y: return [x, y, width, height] for hit-test and drag.
-     * Default returns null (not draggable).
+     * Provides the HUD element's screen bounds as [x, y, width, height] for hit-testing and dragging.
+     *
+     * @return an int array [x, y, width, height] representing the element's bounds, or `null` if the module is not draggable.
      */
     public int[] getHudBounds() {
         return null;

@@ -18,6 +18,17 @@ public class DurabilityViewerModule extends Module {
     private Setting<Boolean> warnLow;
     private Setting<Integer> warnThreshold;
 
+    /**
+     * Creates the Durability Viewer module and registers its configurable HUD settings.
+     *
+     * Initializes settings that control the module's screen position, display format,
+     * and low-durability warning behavior:
+     * - "pos_x": horizontal HUD position (default 10)
+     * - "pos_y": vertical HUD position (default 100)
+     * - "show_percent": display durability as a percentage (default true)
+     * - "warn_low": enable low-durability warnings (default true)
+     * - "warn_threshold": warning threshold in percent (default 10)
+     */
     public DurabilityViewerModule() {
         super("durability_viewer", "Durability Viewer", "Прочность предмета в руке", Category.HUD);
 
@@ -28,11 +39,27 @@ public class DurabilityViewerModule extends Module {
         warnThreshold = addSetting(Setting.ofInt("warn_threshold", "Порог", "Порог предупреждения (%)", 10, 1, 50));
     }
 
+    /**
+     * Provide the HUD element's bounding rectangle in screen coordinates.
+     *
+     * @return an int array [x, y, width, height] where x and y are the current HUD position and width and height are 120 and 12 respectively
+     */
     @Override
     public int[] getHudBounds() {
         return new int[] { posX.getValue(), posY.getValue(), 120, 12 };
     }
 
+    /**
+     * Renders the durability HUD for the item held in the player's main hand.
+     *
+     * Draws the label "Прочность: " followed by either a percentage or "remaining/max" durability
+     * at the configured HUD position and color. If the module is disabled, the player is null,
+     * or the held item is empty or not damageable, nothing is rendered. When low-durability
+     * warnings are enabled and the durability percent is at or below the configured threshold,
+     * the text color changes to the warning color.
+     *
+     * @param partialTicks fractional tick time used for interpolation during rendering
+     */
     @Override
     public void onRender(float partialTicks) {
         if (!isEnabled()) return;

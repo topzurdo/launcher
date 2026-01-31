@@ -17,6 +17,18 @@ public class CoordinatesModule extends Module {
     private Setting<Boolean> showBiome;
     private Setting<Boolean> showDirection;
 
+    /**
+     * Creates the Coordinates HUD module and registers its configurable settings.
+     *
+     * <p>Initializes and registers the following settings:
+     * <ul>
+     *   <li>{@code posX} — horizontal HUD position (default 10, range 0 to 2000)</li>
+     *   <li>{@code posY} — vertical HUD position (default 380, range 0 to 2000)</li>
+     *   <li>{@code showNether} — toggle Nether/Overworld coordinate display (default true)</li>
+     *   <li>{@code showBiome} — toggle current biome display (default false)</li>
+     *   <li>{@code showDirection} — toggle facing direction display (default true)</li>
+     * </ul>
+     */
     public CoordinatesModule() {
         super("coordinates", "Coordinates", "Координаты игрока", Category.HUD);
 
@@ -27,6 +39,11 @@ public class CoordinatesModule extends Module {
         showDirection = addSetting(Setting.ofBoolean("show_direction", "Направление", "Показывать направление", true));
     }
 
+    /**
+     * Provide the HUD bounds rectangle based on the current X/Y settings.
+     *
+     * @return an int array [x, y, width, height] representing the HUD position and fixed size (180, 40)
+     */
     @Override
     public int[] getHudBounds() {
         int x = posX.getValue();
@@ -34,6 +51,16 @@ public class CoordinatesModule extends Module {
         return new int[] { x, y, 180, 40 };
     }
 
+    /**
+     * Renders the coordinates HUD including player XYZ, optional Nether/Overworld coordinates, and facing direction.
+     *
+     * Displays the player's current X/Y/Z at the module's configured HUD position and, when enabled, the corresponding
+     * Nether or Overworld coordinates (transformed by factor 8) and the cardinal facing direction derived from player yaw.
+     * Rendering is skipped if the module is disabled or if the Minecraft player or world is unavailable. Position and
+     * visibility are controlled by the module settings (posX, posY, showNether, showDirection).
+     *
+     * @param partialTicks the frame interpolation fraction used for rendering
+     */
     @Override
     public void onRender(float partialTicks) {
         if (!isEnabled()) return;

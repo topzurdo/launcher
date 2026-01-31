@@ -20,6 +20,13 @@ import net.minecraft.util.Identifier;
 @Mixin(WorldRenderer.class)
 public class WorldRendererSkyComfortMixin {
 
+    /**
+     * Applies the SkyComfort module's configured sky color and brightness to the GL clear color before sky rendering.
+     *
+     * If the SkyComfort module is enabled, computes RGB from the module's configured color and brightness and calls
+     * RenderSystem.clearColor with alpha fixed to 1. Does nothing if the module or module manager is unavailable or the
+     * module is disabled.
+     */
     @Inject(method = "renderSky", at = @At("HEAD"))
     private void onRenderSkyHead(net.minecraft.client.util.math.MatrixStack matrices, float tickDelta, CallbackInfo ci) {
         ModuleManager mm = TopZurdoMod.getModuleManager();
@@ -34,6 +41,13 @@ public class WorldRendererSkyComfortMixin {
         com.mojang.blaze3d.systems.RenderSystem.clearColor(r, g, b, 1f);
     }
 
+    /**
+     * Prevents star rendering when the SkyComfort module is enabled and configured to disable stars.
+     *
+     * If the SkyComfort module is present and active and its configuration disables stars, this method cancels the original renderStars call.
+     *
+     * @param ci callback information used to cancel the renderStars invocation
+     */
     @Inject(method = "renderStars()V", at = @At("HEAD"), cancellable = true)
     private void onRenderStars(CallbackInfo ci) {
         ModuleManager mm = TopZurdoMod.getModuleManager();
@@ -44,6 +58,16 @@ public class WorldRendererSkyComfortMixin {
         }
     }
 
+    /**
+     * Prevents binding of sun and moon textures when SkyComfort is active and configured to hide them.
+     *
+     * If the SkyComfort module is enabled and configured to disable sun/moon, binding is skipped for
+     * texture identifiers whose path contains "sun" or "moon". Otherwise this delegates to
+     * TextureManager.bindTexture.
+     *
+     * @param textureManager the texture manager used to bind the texture
+     * @param id the texture identifier to bind; binding may be skipped if its path contains "sun" or "moon"
+     */
     @Redirect(method = "renderSky", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/texture/TextureManager;bindTexture(Lnet/minecraft/util/Identifier;)V"))
     private void onBindTextureInSky(TextureManager textureManager, Identifier id) {
         ModuleManager mm = TopZurdoMod.getModuleManager();

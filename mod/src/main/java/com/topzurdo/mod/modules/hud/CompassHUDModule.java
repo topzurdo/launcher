@@ -14,6 +14,13 @@ public class CompassHUDModule extends Module {
     private Setting<Integer> posY;
     private Setting<Boolean> showDegrees;
 
+    /**
+     * Constructs the Compass HUD module and registers its configurable settings.
+     *
+     * Initializes the module metadata (id, display name, tooltip, category) and registers:
+     * - an integer setting "pos_y" (vertical position) with default 5 and range 0–500,
+     * - a boolean setting "show_degrees" that controls rendering of yaw degrees (default true).
+     */
     public CompassHUDModule() {
         super("compass_hud", "Compass HUD", "Компас", Category.HUD);
 
@@ -21,6 +28,11 @@ public class CompassHUDModule extends Module {
         showDegrees = addSetting(Setting.ofBoolean("show_degrees", "Градусы", "Показывать градусы", true));
     }
 
+    /**
+     * Compute the HUD bounding rectangle for the compass, centered horizontally and positioned using the module's vertical setting.
+     *
+     * @return an int array in the form {@code {x, y, width, height}} describing the bounds to render the HUD, or {@code null} if the game window is unavailable.
+     */
     @Override
     public int[] getHudBounds() {
         MinecraftClient mc = MinecraftClient.getInstance();
@@ -31,6 +43,14 @@ public class CompassHUDModule extends Module {
         return new int[] { cx - 40, y, 80, 30 };
     }
 
+    /**
+     * Render the on-screen compass HUD centered horizontally at the configured vertical position.
+     *
+     * Draws visible cardinal and intercardinal labels relative to the player's current yaw and,
+     * when enabled, renders the yaw as an integer degree string below the compass.
+     *
+     * @param partialTicks Fractional tick time for the current render frame.
+     */
     @Override
     public void onRender(float partialTicks) {
         if (!isEnabled()) return;

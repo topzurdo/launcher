@@ -50,6 +50,14 @@ public class TopZurdoClientMod implements ClientModInitializer {
     private int hudDragStartPosX = 0;
     private int hudDragStartPosY = 0;
 
+    /**
+     * Initialize client-side components and register the mod's runtime hooks.
+     *
+     * Sets up configuration and the ModuleManager, attempts to disable demo mode, creates the
+     * mod menu keybinding, replaces the main menu, enables HUD drag-and-drop while ChatScreen
+     * is open, and registers screen, input, HUD/world render, tick, and attack event handlers
+     * used by the modules.
+     */
     @Override
     public void onInitializeClient() {
         clientInstance = this;
@@ -228,6 +236,15 @@ public class TopZurdoClientMod implements ClientModInitializer {
         TopZurdoMod.getLogger().info("[TopZurdo] Client setup complete");
     }
 
+    /**
+     * Perform per-client tick duties such as handling mod menu opening input, retrying demo-disable,
+     * advancing the module manager, updating HUD drag positions while ChatScreen is open, and polling
+     * the zoom key state.
+     *
+     * <p>Does nothing if the client or world/player are not available.</p>
+     *
+     * @param client the Minecraft client instance used for state checks and input polling
+     */
     private void onClientTick(MinecraftClient client) {
         if (client.world == null || client.player == null) return;
 
@@ -354,7 +371,14 @@ public class TopZurdoClientMod implements ClientModInitializer {
         return clientInstance;
     }
 
-    /** Find slot at screen coordinates for HandledScreen */
+    /**
+     * Locate the inventory slot displayed at the given screen coordinates within a HandledScreen.
+     *
+     * @param screen the handled screen to query
+     * @param mouseX the x coordinate in screen space
+     * @param mouseY the y coordinate in screen space
+     * @return the Slot whose 16x16 bounds contain the given coordinates, or null if none is found
+     */
     private static Slot getSlotAt(HandledScreen<?> screen, double mouseX, double mouseY) {
         com.topzurdo.mod.patches.mixins.HandledScreenAccessor accessor = (com.topzurdo.mod.patches.mixins.HandledScreenAccessor) screen;
         for (Slot slot : screen.getScreenHandler().slots) {
@@ -367,7 +391,11 @@ public class TopZurdoClientMod implements ClientModInitializer {
         return null;
     }
 
-    /** Find HUD module at screen position (when ChatScreen is open). Reverse order so topmost wins. */
+    /**
+     * Locate the topmost enabled HUD module whose HUD bounds contain the specified screen coordinates.
+     *
+     * @return the topmost enabled HUD module whose bounds contain the specified screen coordinates, or null if none is found
+     */
     private com.topzurdo.mod.modules.Module getHudModuleAt(double mouseX, double mouseY) {
         if (moduleManager == null) return null;
         int mx = (int) mouseX;
@@ -385,7 +413,18 @@ public class TopZurdoClientMod implements ClientModInitializer {
         return null;
     }
 
-    /** Set HUD module position (pos_x, pos_y). For compass_hud only pos_y is updated. */
+    /**
+     * Update a HUD module's stored position settings and persist the changes.
+     *
+     * If the module's id is "compass_hud", only the vertical position ("pos_y") is updated.
+     * Provided coordinates are clamped to the range 0 through 2000. For each present setting
+     * with key "pos_x" or "pos_y" the corresponding value is updated and the setting is saved
+     * under the module id.
+     *
+     * @param m the HUD module whose position settings will be updated
+     * @param x the desired horizontal coordinate (will be clamped to 0–2000)
+     * @param y the desired vertical coordinate (will be clamped to 0–2000)
+     */
     private void setHudModulePosition(com.topzurdo.mod.modules.Module m, int x, int y) {
         String id = m.getId();
         boolean compassOnly = "compass_hud".equals(id);

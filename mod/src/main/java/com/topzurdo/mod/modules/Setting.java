@@ -126,8 +126,17 @@ public class Setting<T> {
     }
 
     /**
-     * Load value from config
-     */
+         * Loads this setting's value from the mod configuration and updates the setting's current value.
+         *
+         * <p>If no configuration is available, the method returns without changing state. The loaded value
+         * is converted to the setting's expected type when possible (including numeric conversions for
+         * Integer/Float/Double). For option-type settings, numeric JSON values are treated as invalid and
+         * cause the value to fall back to the default (or the first option). After loading, numeric values
+         * are clamped to the configured min/max when both are present. If a cast fails, the setting is
+         * reset to its default value.</p>
+         *
+         * @param moduleId the module identifier used to locate the setting in the configuration
+         */
     @SuppressWarnings("unchecked")
     public void load(String moduleId) {
         ModConfig config = TopZurdoMod.getConfig();

@@ -77,6 +77,11 @@ public class TopZurdoMenuScreen extends Screen {
     /** Footer debug-logging button bounds (computed in init). */
     private int footerLogX, footerLogY, footerLogW, footerLogH;
 
+    /**
+     * Constructs a TopZurdoMenuScreen with no parent screen.
+     *
+     * Use the single-argument constructor to create the screen with a parent.
+     */
     public TopZurdoMenuScreen() {
         this(null);
     }
@@ -86,6 +91,13 @@ public class TopZurdoMenuScreen extends Screen {
         this.parent = parent;
     }
 
+    /**
+     * Initializes the menu screen: computes adaptive layout, restores UI state, and constructs UI components.
+     *
+     * Sets up scaled GUI metrics and panel widths, restores the previously selected category and module,
+     * creates module cards, and initializes the module and settings scroll containers. Also restores scroll
+     * offsets, computes footer debug-button bounds, and creates the hand cursor used for hover interactions.
+     */
     @Override
     protected void init() {
         super.init();
@@ -231,6 +243,16 @@ public class TopZurdoMenuScreen extends Screen {
         if (settingsScroll != null) config.setSettingsScrollOffset(settingsScroll.getScrollOffset());
     }
 
+    /**
+     * Rebuilds the settings UI for the currently selected module.
+     *
+     * Clears existing setting rows and the backing settings list, then if a module is selected
+     * creates a SettingRow for each of its settings using the panel-derived row width. Each row
+     * is wired with an onChanged handler that persists the setting value and—when the selected
+     * module is a ContainerSearcherModule and the setting is a string—updates that module's
+     * search query. After creating rows, updates the total settings content height and, if a
+     * settings scroll container exists, sets its content height and resets its scroll offset.
+     */
     private void updateSettingsComponents() {
         settingRows.clear();
         settingsList.clear();
@@ -285,6 +307,18 @@ public class TopZurdoMenuScreen extends Screen {
         for (SettingRow row : settingRows) row.tick();
     }
 
+    /**
+     * Render the TopZurdo menu screen, drawing the background, UI panels, controls, and footer,
+     * and updating the mouse cursor for interactive regions.
+     *
+     * This method paints the full screen UI (background, title bar, category/module/settings panels,
+     * shadows, and footer) and then delegates to super.render to allow child components to draw.
+     *
+     * @param ms the current MatrixStack for rendering transforms
+     * @param mouseX the current mouse x position in screen coordinates
+     * @param mouseY the current mouse y position in screen coordinates
+     * @param partialTicks interpolation value between ticks for smooth animations
+     */
     @Override
     public void render(MatrixStack ms, int mouseX, int mouseY, float partialTicks) {
         try {
@@ -519,6 +553,14 @@ public class TopZurdoMenuScreen extends Screen {
         }
     }
 
+    /**
+     * Determines whether the specified mouse coordinates lie over any interactive UI element (category tabs, module cards, or any setting control),
+     * taking current scroll offsets into account.
+     *
+     * @param mx the mouse x-coordinate in GUI/screen space
+     * @param my the mouse y-coordinate in GUI/screen space
+     * @return `true` if the coordinates are over an interactive component, `false` otherwise
+     */
     private boolean isOverInteractiveComponent(int mx, int my) {
         int localMy = my;
         int off = settingsScroll != null ? settingsScroll.getScrollOffset() : 0;
@@ -570,6 +612,17 @@ public class TopZurdoMenuScreen extends Screen {
         return false;
     }
 
+    /**
+     * Renders the screen footer: a wrapped hint text block and a toggleable debug-logging button.
+     *
+     * The footer displays one or more wrapped hint lines at the left and a debug state button at the right.
+     * The debug button shows the current debug label (on/off), highlights when hovered, and renders a glowing border
+     * and background according to the hover state and theme colors.
+     *
+     * @param ms      the current matrix stack for rendering
+     * @param mouseX  current mouse X position in screen coordinates
+     * @param mouseY  current mouse Y position in screen coordinates
+     */
     private void renderFooter(MatrixStack ms, int mouseX, int mouseY) {
         int footerRowTop = guiTop + guiHeight - OceanTheme.FOOTER_H;
         int hintMaxW = guiWidth - OceanTheme.SPACE_24 - (footerLogW + OceanTheme.SPACE_12);
@@ -589,6 +642,20 @@ public class TopZurdoMenuScreen extends Screen {
         textRenderer.drawWithShadow(ms, logLabel, footerLogX + (footerLogW - textRenderer.getWidth(logLabel)) / 2, footerLogY + (footerLogH - 9) / 2, debugOn ? OceanTheme.ACCENT : DesignTokens.fgMuted());
     }
 
+    /**
+     * Renders an "ocean" themed panel with layered glow and decorative accents.
+     *
+     * The panel consists of a soft multi-layered glow, a header band, the main
+     * panel body, an optional colored category column, a glowing border, a thin
+     * top highlight line, and corner accent marks.
+     *
+     * @param ms   the current matrix stack for rendering transforms
+     * @param x    the left X coordinate of the panel
+     * @param y    the top Y coordinate of the panel
+     * @param w    the width of the panel
+     * @param h    the height of the panel
+     * @param catW the width of the left category column; if <= 0 no column is drawn
+     */
     private void drawOceanPanel(MatrixStack ms, int x, int y, int w, int h, int catW) {
         int glowColor = UIRenderHelper.withAlpha(OceanTheme.NEON_PURPLE, 0.08f);
         for (int i = 4; i > 0; i -= 2) {
@@ -658,6 +725,17 @@ public class TopZurdoMenuScreen extends Screen {
         RenderSystem.enableScissor(sx, sy, sw, sh);
     }
 
+    /**
+     * Handles a mouse click within the menu UI, dispatching the event to interactive components and performing the associated actions.
+     *
+     * <p>Possible observable effects include: changing the selected category or module, toggling a module, updating and focusing setting controls,
+     * starting scrollbar dragging, toggling the footer debug-logging state, saving UI state, and delegating unhandled clicks to the superclass.</p>
+     *
+     * @param mouseX the mouse X coordinate in window space
+     * @param mouseY the mouse Y coordinate in window space
+     * @param button the mouse button pressed (0 = left, 1 = right, etc.)
+     * @return {@code true} if the click was handled by this screen (consumed), {@code false} if it was not handled
+     */
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         try {
